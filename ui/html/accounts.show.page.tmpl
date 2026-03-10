@@ -1,0 +1,31 @@
+{{template "base" .}}
+
+{{define "title"}}
+  Account
+{{end}}
+
+{{define "main"}}
+
+  {{with .Account}}
+    <div>
+      <div>
+        <label>Name:</label> {{.Name}}
+      </div>
+      <div>
+        <ul>
+          <li>Account Type: {{.AccountType}}</li>
+          <li>
+            Bank Account Id:
+            {{if .BankAccountId.Valid}}
+              {{.BankAccountId.String}}
+            {{end}}
+          </li>
+          <li>Sort Order: {{.SortOrder}}</li>
+        </ul>
+      </div>
+    </div>
+  {{end}}
+
+  {{template "jacctentriestable" .}}
+
+{{end}}

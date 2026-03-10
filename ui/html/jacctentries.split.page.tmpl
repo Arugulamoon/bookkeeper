@@ -1,0 +1,62 @@
+{{template "base" .}}
+
+{{define "title"}}
+  Split Journal Account Entry
+{{end}}
+
+{{define "main"}}
+
+  {{$jAcctEntry := .JournalAccountEntry}}
+  {{$accts := .Accounts}}
+
+  <form action='/journal/account/entries/{{$jAcctEntry.Id}}/split?fromUrl={{.FromUrl}}' method='POST'>
+    <div>
+      <label>Date:</label> {{formatDate $jAcctEntry.Date}}
+    </div>
+
+    <div>
+      <label>Description:</label> {{$jAcctEntry.Description}}
+    </div>
+
+    <div>
+      <label>Total Amount:</label>
+      ${{printf "%.2f" $jAcctEntry.Amount}}
+    </div>
+
+    <div>
+      </label>Account 1:</label>
+      {{$jAcctEntry.AccountType}}: {{$jAcctEntry.AccountName}}
+    </div>
+
+    <div>
+      <label>Amount 1:</label>
+      $<input type="text" name="amount1" value="{{printf "%.2f" $jAcctEntry.Amount}}">
+    </div>
+
+    <div>
+      <label>Account 2:</label>
+      <select name='acct2'>
+        <option value='' selected></option>
+        {{range $acc := $accts}}
+          <option value='{{$acc.AccountType}}#{{$acc.Name}}'>
+            {{$acc.AccountType}}: {{$acc.Name}}
+          </option>
+        {{end}}
+      </select>
+    </div>
+
+    <div>
+      <label>Amount 2:</label>
+      $<input type="text" name="amount2">
+    </div>
+
+    <div>
+      <label>Bank Account:</label> {{$jAcctEntry.BankAccountName}}
+    </div>
+
+    <div>
+      <input type='submit' value='Save'>
+    </div>
+  </form>
+
+{{end}}

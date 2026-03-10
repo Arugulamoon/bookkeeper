@@ -1,0 +1,38 @@
+{{template "base" .}}
+
+{{define "title"}}
+  Accounts
+{{end}}
+
+{{define "main"}}
+
+  <table class="table table-striped table-hover">
+    <thead>
+      <tr>
+        <th>Account Type</th>
+        <th>Name</th>
+        <th>Bank Account Id</th>
+        <th>Sort Order</th>
+      </tr>
+    </thead>
+    <tbody class="table-group-divider">
+      {{range .Accounts}}
+        <tr>
+          <td>{{.AccountType}}</td>
+          <td>
+            <a href="/account/{{.AccountType}}/{{.Name}}">
+              {{.Name}}
+            </a>
+          </td>
+          <td>
+            {{if .BankAccountId.Valid}}
+              {{.BankAccountId.String}}
+            {{end}}
+          </td>
+          <td>{{.SortOrder}}</td>
+        </tr>
+      {{end}}
+    </tbody>
+  </table>
+
+{{end}}

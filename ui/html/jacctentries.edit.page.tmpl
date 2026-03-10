@@ -1,0 +1,66 @@
+{{template "base" .}}
+
+{{define "title"}}
+  Edit Journal Account Entry
+{{end}}
+
+{{define "main"}}
+
+  {{$jAcctEntry := .JournalAccountEntry}}
+  {{$accts := .Accounts}}
+
+  <form action='/journal/account/entries/{{$jAcctEntry.Id}}/edit?fromUrl={{.FromUrl}}' method='POST'>
+    <div>
+      <label>Date:</label> {{formatDate $jAcctEntry.Date}}
+    </div>
+
+    <div>
+      <label>Description:</label> {{$jAcctEntry.Description}}
+    </div>
+
+    <div>
+      <label>Account:</label>
+      <select name='acct'>
+        {{range $acc := $accts}}
+          {{if eq $acc.AccountType $jAcctEntry.AccountType}}
+            {{if eq $acc.Name $jAcctEntry.AccountName}}
+              <option value='{{$acc.AccountType}}#{{$acc.Name}}' selected>
+                {{$acc.AccountType}}: {{$acc.Name}}
+              </option>
+            {{else}}
+              <option value='{{$acc.AccountType}}#{{$acc.Name}}'>
+                {{$acc.AccountType}}: {{$acc.Name}}
+              </option>
+            {{end}}
+          {{else}}
+            <option value='{{$acc.AccountType}}#{{$acc.Name}}'>
+              {{$acc.AccountType}}: {{$acc.Name}}
+            </option>
+          {{end}}
+        {{end}}
+      </select>
+    </div>
+
+    <div>
+      <label>Amount:</label>
+      {{if eq $jAcctEntry.AccountBalanceType $jAcctEntry.BalanceType}}
+        <span style="color: green;">
+          ${{printf "%.2f" $jAcctEntry.Amount}}
+        </span>
+      {{else}}
+        <span style="color: red;">
+          {{printf "$-%.2f" $jAcctEntry.Amount}}
+        </span>
+      {{end}}
+    </div>
+
+    <div>
+      <label>Bank Account:</label> {{$jAcctEntry.BankAccountName}}
+    </div>
+
+    <div>
+      <input type='submit' value='Save'>
+    </div>
+  </form>
+
+{{end}}

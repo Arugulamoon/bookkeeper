@@ -1,0 +1,30 @@
+{{template "base" .}}
+
+{{define "title"}}
+  Create a New Account
+{{end}}
+
+{{define "main"}}
+
+  <form action='/account/create' method='POST'>
+    <div>
+      <label>Account Type:</label>
+      <input type='text' name='acctType'>
+    </div>
+
+    <div>
+      <label>Name:</label>
+      <input type='text' name='name'>
+    </div>
+
+    <div>
+      <label>Sort Order:</label>
+      <input type='number' name='sortOrder' min='0' max='1000'>
+    </div>
+
+    <div>
+      <input type='submit' value='Submit'>
+    </div>
+  </form>
+
+{{end}}

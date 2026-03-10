@@ -1,0 +1,32 @@
+{{template "base" .}}
+
+{{define "title"}}
+  Assigner
+{{end}}
+
+{{define "main"}}
+
+  {{with .Assigner}}
+    <div>
+      <label>Name:</label>
+      {{.Name}}
+    </div>
+    <div>
+      <label>Account Type:</label>
+      {{.AccountType}}
+    </div>
+    <div>
+      <label>Account:</label>
+      <a href="/account/{{.AccountType}}/{{.AccountName}}">
+        {{.AccountName}}
+      </a>
+    </div>
+    <div>
+      <label>Bank Transaction Descriptions:</label>
+      {{join .BankTransactionDescriptions "; "}}
+    </div>
+  {{end}}
+
+  {{template "jacctentriestable" .}}
+
+{{end}}

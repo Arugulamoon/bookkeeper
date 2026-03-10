@@ -1,0 +1,155 @@
+---
+bank:
+  currencies:
+    - id: CAD
+      name: CAD
+  banks:
+    - id: RBC
+      name: RBC
+      accounts:
+        - name: RBC Chequing
+          type: Chequing
+          files:
+            - ./testdata/rbc-chequing.csv
+          payment_made_descriptions:
+            - MISC PAYMENT
+        - name: RBC Visa
+          type: Visa
+          files:
+            - ./testdata/rbc-visa.csv
+          payment_received_descriptions:
+            - AUTOMATIC PAYMENT - THANK YOU
+            - AUTOMATIC PAYMENT -THANK YOU
+    - id: CIBC
+      name: CIBC
+      accounts:
+        - name: CIBC Costco Mastercard
+          type: Mastercard
+          files:
+            - ./testdata/cibc-costco-mastercard.csv
+          payment_received_descriptions:
+            - PRE-AUTHORIZED PAYMENT - THANK YOU
+book:
+  currencies:
+    - id: CAD
+      name: CAD
+  accounts:
+    - account_type: Asset
+      name: Cash
+      sort_order: 1
+    - account_type: Asset
+      name: RBC Chequing
+      bank_account: RBC Chequing
+      sort_order: 2
+    - account_type: Liability
+      name: RBC Visa
+      bank_account: RBC Visa
+      sort_order: 1
+    - account_type: Liability
+      name: CIBC Costco Mastercard
+      bank_account: CIBC Costco Mastercard
+      sort_order: 1
+    - account_type: Revenue
+      name: Payroll
+      sort_order: 1
+    - account_type: Revenue
+      name: Unassigned
+    - account_type: Expense
+      name: "Food & Drink: Fast Food"
+    - account_type: Expense
+      name: "Sports: Hockey"
+    - account_type: Expense
+      name: "Sports: Soccer"
+    - account_type: Expense
+      name: School
+    - account_type: Expense
+      name: Unassigned
+  assigners:
+    - name: Some Employer Payroll
+      account_type: Revenue
+      account: Payroll
+      descriptions:
+        - PAYROLL DEPOSIT SOME EMPLOYER
+    - name: A&W
+      account_type: Expense
+      account: "Food & Drink: Fast Food"
+      descriptions:
+        - A&W
+        - A & W
+    - name: Local Hockey Association
+      account_type: Expense
+      account: "Sports: Hockey"
+      descriptions:
+        - LOCAL HOCKEY ASSOCIATION
+    - name: Local Soccer
+      account_type: Expense
+      account: "Sports: Soccer"
+      descriptions:
+        - LOCALSOCCER
+    - name: Some School
+      account_type: Expense
+      account: School
+      descriptions:
+        - e-Transfer sent Some School
+sports:
+  registrations:
+    - name: Soccer
+      price:
+        regular: 17200
+        discount: 2000
+        total: 15200
+      location: Local Park
+      time:
+        day: Saturday
+        start: 9:00
+        duration: 60
+      date:
+        start: 2025-09-05
+        end: 2025-10-30
+      sessions: 9
+    - name: Hockey
+      price:
+        regular: 41000
+        discount: 5000
+        total: 36000
+      location: Local Arena
+      time:
+        day: Saturday
+        range:
+          start: 7:00
+          end: 15:00
+        duration: 50
+      date:
+        start: 2025-09-06
+        end: 2026-03-28
+      sessions: 28
+school:
+  grades:
+    - id: JK
+      name: Junior Kindergarten
+  schools:
+    - id: SOMESCHOOL
+      name: Some School
+  school_years:
+    - school_year: 2025-26
+      school: SOMESCHOOL
+      grade: JK
+  invoices:
+    - due_date: 2025-09-01
+      school_year: 2025-26
+      school: SOMESCHOOL
+      grade: JK
+      description: Tuition
+      amount: 100000
+      date_paid: 2025-09-01
+      reimbursement:
+        split: 50/50
+        amount: 50000
+        date: 2025-09-07
+    - due_date: 2025-09-15
+      school_year: 2025-26
+      school: SOMESCHOOL
+      grade: JK
+      description: Pizza Lunches
+      amount: 2550
+      date_paid: 2025-09-15

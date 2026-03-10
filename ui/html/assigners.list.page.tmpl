@@ -1,0 +1,34 @@
+{{template "base" .}}
+
+{{define "title"}}
+  Assigners
+{{end}}
+
+{{define "main"}}
+
+  <table class="table table-striped table-hover">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Account Type</th>
+        <th>Account</th>
+        <th>Bank Transaction Descriptions</th>
+      </tr>
+    </thead>
+    <tbody class="table-group-divider">
+      {{range .Assigners}}
+        <tr>
+          <td><a href='/assigner/{{.Id}}'>{{.Name}}</a></td>
+          <td>{{.AccountType}}</td>
+          <td>
+            <a href='/account/{{.AccountType}}/{{.AccountName}}'>
+              {{.AccountName}}
+            </a>
+          </td>
+          <td>{{join .BankTransactionDescriptions "; "}}</td>
+        </tr>
+      {{end}}
+    </tbody>
+  </table>
+
+{{end}}

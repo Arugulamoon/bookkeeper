@@ -1,0 +1,60 @@
+{{template "base" .}}
+
+{{define "title"}}
+  Sports
+{{end}}
+
+{{define "main"}}
+
+  {{if eq .Type "currentAndUpcoming"}}
+    <h2>Current and Upcoming Registrations</h2>
+  {{else if eq .Type "past"}}
+    <h2>Past Registrations</h2>
+  {{else}}
+    <h2>Registrations</h2>
+  {{end}}
+
+  <table class="table table-striped table-hover">
+    <thead>
+      <tr>
+        <th>Start Date</th>
+        <th>End Date</th>
+        <th>Name</th>
+        <th>Day</th>
+        <th>Time</th>
+        <th>Duration</th>
+        <th>Location</th>
+        <th>Price</th>
+        <th>Sessions</th>
+        <th>Price per Session</th>
+      </tr>
+    </thead>
+    <tbody class="table-group-divider">
+      {{range .SportsRegistrations}}
+        <tr
+          {{if .IsUpcoming}} class="table-warning"
+          {{else if .IsCurrent}} class="table-success"
+          {{end}}
+        >
+          <td class="text-nowrap">{{formatDate .StartDate}}</td>
+          <td class="text-nowrap">{{formatDate .EndDate}}</td>
+          <td>{{.Name}}</td>
+          <td class="text-nowrap">{{.Day}}</td>
+          <td class="text-nowrap">
+            {{if eq .StartTime ""}}
+              {{.StartTimeRange}} - {{.EndTimeRange}}
+            {{else}}
+              {{.StartTime}}
+            {{end}}
+          </td>
+          <td class="text-nowrap">{{.Duration}}</td>
+          <td>{{.Location}}</td>
+          <td class="text-nowrap">${{.Price}}</td>
+          <td class="text-nowrap">{{.Sessions}}</td>
+          <td class="text-nowrap">${{.PricePerSession}}</td>
+        </tr>
+      {{end}}
+    </tbody>
+  </table>
+
+{{end}}
