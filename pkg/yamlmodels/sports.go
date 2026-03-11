@@ -1,9 +1,12 @@
 package yamlmodels
 
+import "time"
+
 // TODO: Change date string to time.Time using custom unmarshaller
 
 type SportsData struct {
 	Registrations []Registration `yaml:"registrations"`
+	Memberships   []Membership   `yaml:"memberships"`
 }
 
 type Registration struct {
@@ -39,4 +42,26 @@ type Range struct {
 type Date struct {
 	Start string `yaml:"start"`
 	End   string `yaml:"end"`
+}
+
+type Membership struct {
+	Name     string `yaml:"name"`
+	Season   Season `yaml:"season"`
+	Location string `yaml:"location"`
+	Games    []Game `yaml:"games"`
+}
+
+type Season struct {
+	Year string `yaml:"year"`
+	Type string `yaml:"type"`
+}
+
+type Game struct {
+	Date     time.Time `yaml:"date"`
+	Time     Time      `yaml:"time"`
+	Opponent string    `yaml:"opponent"`
+	Type     string    `yaml:"type"`
+	Notes    string    `yaml:"notes"`
+	Location string    `yaml:"location"`
+	Event    Event     `yaml:"event"`
 }

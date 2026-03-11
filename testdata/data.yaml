@@ -123,6 +123,20 @@ sports:
         start: 2025-09-06
         end: 2026-03-28
       sessions: 28
+  memberships:
+    - name: Ottawa Charge
+      season:
+        year: 2025-26
+        type: Regular
+      location: TD Place, Exhibition Way
+      games:
+        - date: 2025-11-22
+          time:
+            start: 19:00
+          opponent: New York Sirens
+          type: Home
+          notes: Home Opener! Magnet Schedule & Rally Towel Giveaway!
+          location: TD Place, Exhibition Way
 school:
   grades:
     - id: JK

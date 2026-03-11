@@ -31,6 +31,8 @@ type application struct {
 	banks            *postgres.BankModel
 	bankAccounts     *postgres.BankAccountModel
 	bankTransactions *postgres.BankTransactionModel
+
+	sportsMemberships *postgres.SportsMembershipModel
 }
 
 func main() {
@@ -79,6 +81,8 @@ func main() {
 		banks:            &postgres.BankModel{DB: db},
 		bankAccounts:     &postgres.BankAccountModel{DB: db},
 		bankTransactions: &postgres.BankTransactionModel{DB: db},
+
+		sportsMemberships: &postgres.SportsMembershipModel{DB: db},
 	}
 
 	app.initBank(data.Bank)
@@ -371,6 +375,28 @@ func (app *application) initSports(data yamlmodels.SportsData) {
 		)
 		if err != nil {
 			panic(err)
+		}
+	}
+
+	app.initSportsMemberships(data.Memberships)
+}
+
+func (app *application) initSportsMemberships(
+	memberships []yamlmodels.Membership,
+) {
+	for _, membership := range memberships {
+		membershipId, err := app.sportsMemberships.Insert(membership.Name,
+			membership.Season.Year, membership.Season.Type, membership.Location)
+		if err != nil {
+			panic(err)
+		}
+		for _, game := range membership.Games {
+			_, err := app.sportsMemberships.InsertHomeGame(membershipId,
+				game.Date, game.Time.Start, game.Opponent, game.Notes, game.Location,
+				game.Event.Id)
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 }

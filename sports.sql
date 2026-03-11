@@ -17,3 +17,23 @@ CREATE TABLE sports.registrations (
   end_date DATE,
   sessions INTEGER
 );
+
+CREATE TABLE sports.memberships (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255) NOT NULL,
+  season_year VARCHAR(7) NOT NULL,
+  season_type VARCHAR(50) NOT NULL,
+  location VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE sports.membership_games (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  membership_id UUID NOT NULL
+    REFERENCES sports.memberships (id),
+  date DATE NOT NULL,
+  start_time VARCHAR(5) NOT NULL,
+  opponent VARCHAR(50) NOT NULL,
+  notes VARCHAR(255),
+  location VARCHAR(255),
+  event_id CHAR(26)
+);

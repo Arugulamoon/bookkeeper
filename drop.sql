@@ -1,4 +1,6 @@
 -- SPORTS
+DROP TABLE IF EXISTS sports.membership_games;
+DROP TABLE IF EXISTS sports.memberships;
 DROP TABLE IF EXISTS sports.registrations;
 DROP SCHEMA IF EXISTS sports;
 
