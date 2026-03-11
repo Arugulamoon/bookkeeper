@@ -1,5 +1,5 @@
 -- SPORTS
-DROP TABLE IF EXISTS sports.registration;
+DROP TABLE IF EXISTS sports.registrations;
 DROP SCHEMA IF EXISTS sports;
 
 -- SCHOOL
