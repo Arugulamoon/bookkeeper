@@ -13,7 +13,7 @@ type SportsRegistrationsModel struct {
 func (m *SportsRegistrationsModel) SelectAll() ([]*models.SportsRegistration, error) {
 	stmt := `
 		SELECT *
-		FROM sports.registration AS regs
+		FROM sports.registrations AS regs
 		ORDER BY regs.start_date, regs.end_date;`
 	rows, err := m.DB.Query(stmt)
 	if err != nil {
@@ -27,7 +27,7 @@ func (m *SportsRegistrationsModel) SelectAll() ([]*models.SportsRegistration, er
 func (m *SportsRegistrationsModel) SelectAllCurrentAndUpcoming() ([]*models.SportsRegistration, error) {
 	stmt := `
 		SELECT *
-		FROM sports.registration AS regs
+		FROM sports.registrations AS regs
 		WHERE regs.end_date > NOW()
 		ORDER BY regs.start_date, regs.end_date;`
 	rows, err := m.DB.Query(stmt)
@@ -42,7 +42,7 @@ func (m *SportsRegistrationsModel) SelectAllCurrentAndUpcoming() ([]*models.Spor
 func (m *SportsRegistrationsModel) SelectAllPast() ([]*models.SportsRegistration, error) {
 	stmt := `
 		SELECT *
-		FROM sports.registration AS regs
+		FROM sports.registrations AS regs
 		WHERE regs.end_date < NOW()
 		ORDER BY regs.start_date, regs.end_date;`
 	rows, err := m.DB.Query(stmt)
@@ -97,7 +97,7 @@ func (m *SportsRegistrationsModel) Insert(
 	sessions int,
 ) (int, error) {
 	stmt := `
-		INSERT INTO sports.registration
+		INSERT INTO sports.registrations
 			(name, price, regular_price, discount, tax, location, day, start_time, start_time_range, end_time_range, duration, start_date, end_date, sessions)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);`
 	res, err := m.DB.Exec(stmt,
