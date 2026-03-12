@@ -1,0 +1,36 @@
+{{template "base" .}}
+
+{{define "title"}}
+  Sports
+{{end}}
+
+{{define "main"}}
+
+  <h2>Memberships</h2>
+
+  <table class="table table-striped table-hover">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Season Year</th>
+        <th>Season Type</th>
+        <th>Location</th>
+      </tr>
+    </thead>
+    <tbody class="table-group-divider">
+      {{range .SportsMemberships}}
+        <tr>
+          <td class="text-nowrap">
+            <a href="/sports/memberships/{{.Id}}">
+              {{.Name}}
+            </a>
+          </td>
+          <td class="text-nowrap">{{.SeasonYear}}</td>
+          <td class="text-nowrap">{{.SeasonType}}</td>
+          <td class="text-nowrap">{{.Location}}</td>
+        </tr>
+      {{end}}
+    </tbody>
+  </table>
+
+{{end}}

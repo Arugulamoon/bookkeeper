@@ -52,5 +52,9 @@ func (app *Application) Routes() http.Handler {
 	sportsRegHandler := &handlers.SportsRegistrationHandler{DB: app.DB}
 	e.GET("/sports/registrations", sportsRegHandler.ListRegistrations())
 
+	sportsMembershipHandler := &handlers.SportsMembershipHandler{DB: app.DB}
+	e.GET("/sports/memberships", sportsMembershipHandler.List())
+	e.GET("/sports/memberships/:id", sportsMembershipHandler.Show())
+
 	return e
 }

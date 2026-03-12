@@ -136,7 +136,13 @@ sports:
           opponent: New York Sirens
           type: Home
           notes: Home Opener! Magnet Schedule & Rally Towel Giveaway!
-          location: TD Place, Exhibition Way
+        - date: 2026-04-03
+          time:
+            start: 19:00
+          opponent: Montréal Victoire
+          type: Home
+          notes: Emily Clark Bobblehead Giveaway!
+          location: Canadian Tire Centre
 school:
   grades:
     - id: JK

@@ -45,3 +45,21 @@ func (reg SportsRegistration) Price() int {
 func (reg SportsRegistration) PricePerSession() int {
 	return reg.PriceInCents / reg.Sessions / 100
 }
+
+type SportsMembership struct {
+	Id         string
+	Name       string
+	SeasonYear string
+	SeasonType string
+	Location   string
+}
+
+type SportsMembershipGame struct {
+	Id        string
+	Date      time.Time
+	StartTime string
+	Opponent  string
+	Notes     string
+	Location  string
+	EventId   string
+}
