@@ -10,17 +10,9 @@ import (
 
 // https://www.golinuxcloud.com/golang-parse-yaml-file/
 type Config struct {
-	Server   Server
-	Database Database
-}
-
-type Server struct {
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
-}
-
-func (srv Server) Addr() string {
-	return fmt.Sprintf("%s:%d", srv.Host, srv.Port)
+	Database Database `yaml:"database"`
+	Google   Google   `yaml:"google"`
+	Server   Server   `yaml:"server"`
 }
 
 type Database struct {
@@ -34,6 +26,37 @@ type Database struct {
 func (db Database) DSN() string {
 	return fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=disable",
 		db.Host, db.Port, db.Name, db.User, db.Password)
+}
+
+type Google struct {
+	Auth      GoogleAuth `yaml:"auth"`
+	Calendars []Calendar `yaml:"calendars"`
+}
+
+func (goog Google) GetCalendars() map[string]string {
+	calendars := make(map[string]string)
+	for _, cal := range goog.Calendars {
+		calendars[cal.Name] = cal.Id
+	}
+	return calendars
+}
+
+type GoogleAuth struct {
+	Dir string `yaml:"dir"`
+}
+
+type Calendar struct {
+	Name string `yaml:"name"`
+	Id   string `yaml:"id"`
+}
+
+type Server struct {
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
+}
+
+func (srv Server) Addr() string {
+	return fmt.Sprintf("%s:%d", srv.Host, srv.Port)
 }
 
 func GetConfig(filename string) (*Config, error) {

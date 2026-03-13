@@ -48,6 +48,7 @@ type Membership struct {
 	Name     string `yaml:"name"`
 	Season   Season `yaml:"season"`
 	Location string `yaml:"location"`
+	Calendar string `yaml:"calendar"`
 	Games    []Game `yaml:"games"`
 }
 

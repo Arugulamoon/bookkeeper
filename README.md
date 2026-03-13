@@ -10,6 +10,12 @@ database:
   name: bookkeeper
   user: someuser
   password: somepassword
+google:
+  auth:
+    dir: ~/.config/googleauth/
+  calendars:
+    - name: PWHL Hockey
+      id: something@group.calendar.google.com
 server:
   host: localhost
   port: 4000
@@ -20,7 +26,7 @@ See the [Test Data](testdata/) directory. Create and update a data file using [d
 
 Specify currencies, bank accounts (including paths to csv files to import), accounting accounts and assigners (rules for automatically categorizing transactions to accounting accounts).
 
-Specify sports registrations and school invoices.
+Specify sports registrations, memberships and school invoices.
 
 ## Setup Database
 ```bash

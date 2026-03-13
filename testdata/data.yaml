@@ -129,6 +129,7 @@ sports:
         year: 2025-26
         type: Regular
       location: TD Place, Exhibition Way
+      calendar: PWHL Hockey
       games:
         - date: 2025-11-22
           time:
@@ -142,7 +143,7 @@ sports:
           opponent: Montréal Victoire
           type: Home
           notes: Emily Clark Bobblehead Giveaway!
-          location: Canadian Tire Centre
+          location: Canadian Tire Centre, Palladium Drive
 school:
   grades:
     - id: JK

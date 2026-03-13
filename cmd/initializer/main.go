@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/csv"
 	"flag"
@@ -14,9 +15,12 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
+	"google.golang.org/api/calendar/v3"
+	"google.golang.org/api/option"
 	"gopkg.in/yaml.v3"
 
 	"github.com/Arugulamoon/bookkeeper/pkg/config"
+	"github.com/Arugulamoon/bookkeeper/pkg/google"
 	"github.com/Arugulamoon/bookkeeper/pkg/models/postgres"
 	"github.com/Arugulamoon/bookkeeper/pkg/yamlmodels"
 )
@@ -33,6 +37,8 @@ type application struct {
 	bankTransactions *postgres.BankTransactionModel
 
 	sportsMemberships *postgres.SportsMembershipModel
+
+	calendar *google.EventingGCalendar
 }
 
 func main() {
@@ -71,6 +77,12 @@ func main() {
 	}
 	defer db.Close()
 
+	gcalsvc, err := calendar.NewService(context.Background(),
+		option.WithHTTPClient(google.GetClient(cfg.Google.Auth.Dir)))
+	if err != nil {
+		errorLog.Fatalf("Unable to create Calendar service: %v", err)
+	}
+
 	app := &application{
 		errorLog: errorLog,
 		infoLog:  infoLog,
@@ -83,6 +95,11 @@ func main() {
 		bankTransactions: &postgres.BankTransactionModel{DB: db},
 
 		sportsMemberships: &postgres.SportsMembershipModel{DB: db},
+
+		calendar: &google.EventingGCalendar{
+			Service:   gcalsvc.Events,
+			Calendars: cfg.Google.GetCalendars(),
+		},
 	}
 
 	app.initBank(data.Bank)
@@ -391,11 +408,40 @@ func (app *application) initSportsMemberships(
 			panic(err)
 		}
 		for _, game := range membership.Games {
-			_, err := app.sportsMemberships.InsertHomeGame(membershipId,
+			gameId, err := app.sportsMemberships.InsertGame(membershipId,
 				game.Date, game.Time.Start, game.Opponent, game.Notes, game.Location,
 				game.Event.Id)
 			if err != nil {
 				panic(err)
+			}
+			if game.Event.Id == "" {
+				// TODO: Move into function/method
+				summary := fmt.Sprintf("🚨🏒🥅 %s at Ottawa Charge",
+					game.Opponent)
+				if game.Notes != "" {
+					summary += fmt.Sprintf(" (%s)", game.Notes)
+				}
+
+				var location string
+				if game.Location != "" {
+					location = game.Location
+				} else {
+					location = membership.Location
+				}
+
+				var eventId string
+				if game.Time.Start == "" || game.Time.Start == "TBD" {
+					eventId = app.calendar.CreateAllDayEvent(membership.Calendar,
+						game.Date.Format(time.DateOnly), summary, location)
+				} else {
+					eventId = app.calendar.CreateEvent(membership.Calendar,
+						game.Date.Format(time.DateOnly), game.Time.Start, summary, location)
+				}
+
+				_, err = app.sportsMemberships.UpdateGameEventId(gameId, eventId)
+				if err != nil {
+					panic(err)
+				}
 			}
 		}
 	}

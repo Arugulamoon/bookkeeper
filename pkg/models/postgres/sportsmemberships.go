@@ -138,7 +138,7 @@ func (m *SportsMembershipModel) SelectAllGames(
 	return games, nil
 }
 
-func (m *SportsMembershipModel) InsertHomeGame(
+func (m *SportsMembershipModel) InsertGame(
 	membershipId string,
 	date time.Time,
 	startTime string,
@@ -166,4 +166,21 @@ func (m *SportsMembershipModel) InsertHomeGame(
 		return "", err
 	}
 	return id, nil
+}
+
+func (m *SportsMembershipModel) UpdateGameEventId(id, eventId string) (int, error) {
+	stmt := `
+		UPDATE sports.membership_games
+		SET event_id = $2
+		WHERE id = $1;`
+	res, err := m.DB.Exec(stmt, id, eventId)
+	if err != nil {
+		return 0, err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return int(rowsAffected), nil
 }
