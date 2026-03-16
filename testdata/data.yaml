@@ -124,27 +124,30 @@ sports:
         end: 2026-03-28
       sessions: 28
   memberships:
-    - name: Ottawa Charge
+    - name: Our Team
       season:
         year: 2025-26
         type: Regular
       location: TD Place, Exhibition Way
       calendar: PWHL Hockey
       games:
-        - date: 2025-11-22
+        - date: 2025-09-03
           time:
             start: 19:00
-          opponent: New York Sirens
+          opponent: Some Team
           type: Home
-          notes: Home Opener! Magnet Schedule & Rally Towel Giveaway!
-        - date: 2026-04-03
+          notes: Home Opener!
+        - date: 2025-09-14
           time:
             start: 19:00
-          opponent: Montréal Victoire
+          opponent: Another Team
           type: Home
-          notes: Emily Clark Bobblehead Giveaway!
+          notes: Bobblehead Giveaway!
           location: Canadian Tire Centre, Palladium Drive
 school:
+  calendars:
+    expenses: School Expenses
+    events: School Events
   grades:
     - id: JK
       name: Junior Kindergarten

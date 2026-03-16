@@ -3,10 +3,16 @@ package yamlmodels
 // TODO: Change date string to time.Time using custom unmarshaller
 
 type SchoolData struct {
+	Calendars   Calendars    `yaml:"calendars"`
 	Grades      []Grade      `yaml:"grades"`
 	Schools     []School     `yaml:"schools"`
 	SchoolYears []SchoolYear `yaml:"school_years"`
 	Invoices    []Invoice    `yaml:"invoices"`
+}
+
+type Calendars struct {
+	Expenses string `yaml:"expenses"`
+	Events   string `yaml:"events"`
 }
 
 type Grade struct {

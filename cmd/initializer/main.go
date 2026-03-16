@@ -38,7 +38,13 @@ type application struct {
 
 	sportsMemberships *postgres.SportsMembershipModel
 
-	calendar *google.EventingGCalendar
+	invoices *postgres.InvoicesModel
+
+	schools        *postgres.SchoolModel
+	schoolExpenses *postgres.SchoolExpensesModel
+
+	eventCal   *google.EventingGCalendar
+	expenseCal *google.AccountingGCalendar
 }
 
 func main() {
@@ -96,7 +102,16 @@ func main() {
 
 		sportsMemberships: &postgres.SportsMembershipModel{DB: db},
 
-		calendar: &google.EventingGCalendar{
+		invoices: &postgres.InvoicesModel{DB: db},
+
+		schools:        &postgres.SchoolModel{DB: db},
+		schoolExpenses: &postgres.SchoolExpensesModel{DB: db},
+
+		eventCal: &google.EventingGCalendar{
+			Service:   gcalsvc.Events,
+			Calendars: cfg.Google.GetCalendars(),
+		},
+		expenseCal: &google.AccountingGCalendar{
 			Service:   gcalsvc.Events,
 			Calendars: cfg.Google.GetCalendars(),
 		},
@@ -416,8 +431,8 @@ func (app *application) initSportsMemberships(
 			}
 			if game.Event.Id == "" {
 				// TODO: Move into function/method
-				summary := fmt.Sprintf("🚨🏒🥅 %s at Ottawa Charge",
-					game.Opponent)
+				summary := fmt.Sprintf("🚨🏒🥅 %s at %s",
+					game.Opponent, membership.Name)
 				if game.Notes != "" {
 					summary += fmt.Sprintf(" (%s)", game.Notes)
 				}
@@ -431,10 +446,10 @@ func (app *application) initSportsMemberships(
 
 				var eventId string
 				if game.Time.Start == "" || game.Time.Start == "TBD" {
-					eventId = app.calendar.CreateAllDayEvent(membership.Calendar,
+					eventId = app.eventCal.CreateAllDayEvent(membership.Calendar,
 						game.Date.Format(time.DateOnly), summary, location)
 				} else {
-					eventId = app.calendar.CreateEvent(membership.Calendar,
+					eventId = app.eventCal.CreateEvent(membership.Calendar,
 						game.Date.Format(time.DateOnly), game.Time.Start, summary, location)
 				}
 
@@ -448,16 +463,15 @@ func (app *application) initSportsMemberships(
 }
 
 func (app *application) initSchool(data yamlmodels.SchoolData) {
-	schoolsModel := &postgres.SchoolModel{DB: app.db}
 	for _, grade := range data.Grades {
-		err := schoolsModel.InsertGrade(grade.Id, grade.Name)
+		err := app.schools.InsertGrade(grade.Id, grade.Name)
 		if err != nil {
 			panic(err)
 		}
 	}
 
 	for _, school := range data.Schools {
-		err := schoolsModel.InsertSchool(school.Id, school.Name,
+		err := app.schools.InsertSchool(school.Id, school.Name,
 			school.Address, school.Phone, school.Principal)
 		if err != nil {
 			panic(err)
@@ -465,7 +479,7 @@ func (app *application) initSchool(data yamlmodels.SchoolData) {
 	}
 
 	for _, schoolYear := range data.SchoolYears {
-		err := schoolsModel.InsertSchoolYear(schoolYear.Year,
+		err := app.schools.InsertSchoolYear(schoolYear.Year,
 			schoolYear.SchoolId, schoolYear.GradeId,
 			schoolYear.Teacher, schoolYear.Education)
 		if err != nil {
@@ -474,21 +488,36 @@ func (app *application) initSchool(data yamlmodels.SchoolData) {
 	}
 
 	for _, inv := range data.Invoices {
-		invoicesModel := &postgres.InvoicesModel{DB: app.db}
-		invId, err := invoicesModel.Insert(inv.DueDate, inv.Description, inv.Amount)
+		invId, err := app.invoices.Insert(inv.DueDate, inv.Description, inv.Amount)
 		if err != nil {
 			panic(err)
 		}
-		schoolExpensesModel := &postgres.SchoolExpensesModel{DB: app.db}
-		schoolId, err := schoolExpensesModel.InsertInvoice(
+		schoolInvId, err := app.schoolExpenses.InsertInvoice(
 			invId, inv.SchoolYear, inv.School, inv.Grade,
 			inv.Event.Id, inv.DatePaid, inv.EventMarkedPaid)
 		if err != nil {
 			panic(err)
 		}
+		if inv.Event.Id == "" {
+			// schedule payment
+			summary := fmt.Sprintf("DUE: %s %s %s ($%d)",
+				inv.SchoolYear, inv.Grade, inv.Description, inv.Amount/100)
+			eventId := app.expenseCal.CreateAllDayEvent(
+				data.Calendars.Expenses, inv.DueDate, summary)
+			_, err = app.schoolExpenses.UpdateInvoiceEventId(schoolInvId, eventId)
+			if err != nil {
+				panic(err)
+			}
+			inv.Event.Id = eventId
+		}
+		if inv.Event.Id != "" && inv.DatePaid != nil && !inv.EventMarkedPaid {
+			// mark paid
+			app.expenseCal.MarkEventPaid(data.Calendars.Expenses, inv.Event.Id)
+			app.schoolExpenses.UpdateInvoiceEventMarkedPaid(schoolInvId)
+		}
 		if inv.Reimbursement != nil {
-			_, err = schoolExpensesModel.InsertReimbursement(
-				schoolId,
+			_, err = app.schoolExpenses.InsertReimbursement(
+				schoolInvId,
 				inv.Reimbursement.Split,
 				inv.Reimbursement.Amount,
 				inv.Reimbursement.Date)

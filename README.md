@@ -16,6 +16,8 @@ google:
   calendars:
     - name: PWHL Hockey
       id: something@group.calendar.google.com
+    - name: School Expenses
+      id: something2@group.calendar.google.com
 server:
   host: localhost
   port: 4000

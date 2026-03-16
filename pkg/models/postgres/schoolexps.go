@@ -34,6 +34,44 @@ func (m *SchoolExpensesModel) InsertInvoice(
 	return id, nil
 }
 
+func (m *SchoolExpensesModel) UpdateInvoiceEventId(
+	id, eventId string,
+) (int, error) {
+	stmt := `
+		UPDATE school.invoice
+		SET event_id = $2
+		WHERE id = $1;`
+	res, err := m.DB.Exec(stmt, id, eventId)
+	if err != nil {
+		return 0, err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return int(rowsAffected), nil
+}
+
+func (m *SchoolExpensesModel) UpdateInvoiceEventMarkedPaid(
+	id string,
+) (int, error) {
+	stmt := `
+		UPDATE school.invoice
+		SET event_marked_paid = TRUE
+		WHERE id = $1;`
+	res, err := m.DB.Exec(stmt, id)
+	if err != nil {
+		return 0, err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return int(rowsAffected), nil
+}
+
 func (m *SchoolExpensesModel) InsertReimbursement(
 	invoiceId, split string, amount *int, date *string,
 ) (string, error) {

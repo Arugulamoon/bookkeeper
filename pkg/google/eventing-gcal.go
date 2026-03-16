@@ -33,16 +33,18 @@ func (cal *EventingGCalendar) CreateEvent(
 	}
 	endDateTime := startDateTime.Add(3 * time.Hour)
 
-	event, err := cal.Service.Insert(cal.Calendars[calendarName], &calendar.Event{
-		Summary:  summary,
-		Location: location,
-		Start: &calendar.EventDateTime{
-			DateTime: startDateTime.Format(time.RFC3339),
+	event, err := cal.Service.Insert(cal.Calendars[calendarName],
+		&calendar.Event{
+			Summary:  summary,
+			Location: location,
+			Start: &calendar.EventDateTime{
+				DateTime: startDateTime.Format(time.RFC3339),
+			},
+			End: &calendar.EventDateTime{
+				DateTime: endDateTime.Format(time.RFC3339),
+			},
 		},
-		End: &calendar.EventDateTime{
-			DateTime: endDateTime.Format(time.RFC3339),
-		},
-	}).Do()
+	).Do()
 	if err != nil {
 		log.Fatalf("Unable to insert event: %v", err)
 	}
@@ -59,13 +61,15 @@ func (cal *EventingGCalendar) CreateAllDayEvent(
 	summary string,
 	location string,
 ) string {
-	event, err := cal.Service.Insert(cal.Calendars[calendarName], &calendar.Event{
-		Summary:      summary,
-		Location:     location,
-		Start:        &calendar.EventDateTime{Date: date},
-		End:          &calendar.EventDateTime{Date: date},
-		Transparency: "transparent",
-	}).Do()
+	event, err := cal.Service.Insert(cal.Calendars[calendarName],
+		&calendar.Event{
+			Summary:      summary,
+			Location:     location,
+			Start:        &calendar.EventDateTime{Date: date},
+			End:          &calendar.EventDateTime{Date: date},
+			Transparency: "transparent",
+		},
+	).Do()
 	if err != nil {
 		log.Fatalf("Unable to insert all day event: %v", err)
 	}

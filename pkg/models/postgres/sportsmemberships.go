@@ -168,7 +168,9 @@ func (m *SportsMembershipModel) InsertGame(
 	return id, nil
 }
 
-func (m *SportsMembershipModel) UpdateGameEventId(id, eventId string) (int, error) {
+func (m *SportsMembershipModel) UpdateGameEventId(
+	id, eventId string,
+) (int, error) {
 	stmt := `
 		UPDATE sports.membership_games
 		SET event_id = $2
