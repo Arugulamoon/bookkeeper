@@ -1,23 +1,28 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Arugulamoon/bookkeeper/pkg/models"
 )
 
 type SportsMembershipModel struct {
-	DB *sql.DB
+	DB *pgxpool.Pool
 }
 
-func (m *SportsMembershipModel) SelectAll() ([]*models.SportsMembership, error) {
+func (m *SportsMembershipModel) SelectAll(
+	ctx context.Context,
+) ([]*models.SportsMembership, error) {
 	stmt := `
 		SELECT id, name, season_year, season_type, location
 		FROM sports.memberships
 		ORDER BY season_year, season_type DESC, name;`
-	rows, err := m.DB.Query(stmt)
+	rows, err := m.DB.Query(ctx, stmt)
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +52,7 @@ func (m *SportsMembershipModel) SelectAll() ([]*models.SportsMembership, error) 
 }
 
 func (m *SportsMembershipModel) Select(
+	ctx context.Context,
 	id string,
 ) (*models.SportsMembership, error) {
 	stmt := `
@@ -59,7 +65,7 @@ func (m *SportsMembershipModel) Select(
 		FROM sports.memberships
 		WHERE id = $1;`
 	membership := &models.SportsMembership{}
-	err := m.DB.QueryRow(stmt, id).Scan(
+	err := m.DB.QueryRow(ctx, stmt, id).Scan(
 		&membership.Id,
 		&membership.Name,
 		&membership.SeasonYear,
@@ -77,6 +83,7 @@ func (m *SportsMembershipModel) Select(
 }
 
 func (m *SportsMembershipModel) Insert(
+	ctx context.Context,
 	name, seasonYear, seasonType, location string,
 ) (string, error) {
 	stmt := `
@@ -85,7 +92,7 @@ func (m *SportsMembershipModel) Insert(
 		VALUES ($1, $2, $3, $4)
 		RETURNING id;`
 	var id string
-	err := m.DB.QueryRow(stmt, name, seasonYear, seasonType, location).Scan(&id)
+	err := m.DB.QueryRow(ctx, stmt, name, seasonYear, seasonType, location).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -93,6 +100,7 @@ func (m *SportsMembershipModel) Insert(
 }
 
 func (m *SportsMembershipModel) SelectAllGames(
+	ctx context.Context,
 	id string,
 ) ([]*models.SportsMembershipGame, error) {
 	stmt := `
@@ -107,7 +115,7 @@ func (m *SportsMembershipModel) SelectAllGames(
 		FROM sports.membership_games
 		WHERE membership_id = $1
 		ORDER BY date;`
-	rows, err := m.DB.Query(stmt, id)
+	rows, err := m.DB.Query(ctx, stmt, id)
 	if err != nil {
 		return nil, err
 	}
@@ -139,6 +147,7 @@ func (m *SportsMembershipModel) SelectAllGames(
 }
 
 func (m *SportsMembershipModel) InsertGame(
+	ctx context.Context,
 	membershipId string,
 	date time.Time,
 	startTime string,
@@ -153,7 +162,7 @@ func (m *SportsMembershipModel) InsertGame(
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id;`
 	var id string
-	err := m.DB.QueryRow(stmt,
+	err := m.DB.QueryRow(ctx, stmt,
 		membershipId,
 		date,
 		startTime,
@@ -169,20 +178,16 @@ func (m *SportsMembershipModel) InsertGame(
 }
 
 func (m *SportsMembershipModel) UpdateGameEventId(
+	ctx context.Context,
 	id, eventId string,
 ) (int, error) {
 	stmt := `
 		UPDATE sports.membership_games
 		SET event_id = $2
 		WHERE id = $1;`
-	res, err := m.DB.Exec(stmt, id, eventId)
+	res, err := m.DB.Exec(ctx, stmt, id, eventId)
 	if err != nil {
 		return 0, err
 	}
-
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return 0, err
-	}
-	return int(rowsAffected), nil
+	return int(res.RowsAffected()), nil
 }

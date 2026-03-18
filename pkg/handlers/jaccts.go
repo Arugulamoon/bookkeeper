@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"net/http"
 
@@ -12,7 +11,8 @@ import (
 )
 
 type JournalAccountHandler struct {
-	DB *sql.DB
+	BookAccounts              *postgres.AccountModel
+	BookJournalAccountEntries *postgres.JournalAccountEntryModel
 }
 
 type ShowJournalAccountData struct {
@@ -29,8 +29,8 @@ func (h *JournalAccountHandler) Show() echo.HandlerFunc {
 			return c.String(http.StatusBadRequest, "bad request")
 		}
 
-		accountModel := &postgres.AccountModel{DB: h.DB}
-		acct, err := accountModel.Select(data.AcctType, data.AcctName)
+		acct, err := h.BookAccounts.Select(c.Request().Context(),
+			data.AcctType, data.AcctName)
 		if err != nil {
 			if errors.Is(err, models.ErrNoRecord) {
 				return c.String(http.StatusNotFound, "not found")
@@ -40,8 +40,8 @@ func (h *JournalAccountHandler) Show() echo.HandlerFunc {
 			}
 		}
 
-		jAcctEntryModel := &postgres.JournalAccountEntryModel{DB: h.DB}
-		entries, err := jAcctEntryModel.SelectAllByAccountForMonth(
+		entries, err := h.BookJournalAccountEntries.SelectAllByAccountForMonth(
+			c.Request().Context(),
 			data.AcctType, data.AcctName, data.Year, data.Month)
 		if err != nil {
 			return c.String(http.StatusInternalServerError,

@@ -1,8 +1,11 @@
 package postgres
 
 import (
-	"database/sql"
+	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Arugulamoon/bookkeeper/pkg/models"
 )
@@ -20,16 +23,18 @@ const SELECT_BANK_TRANSACTIONS_STMT_PREFIX = `
 		ON txs.account_id = accts.id`
 
 type BankTransactionModel struct {
-	DB *sql.DB
+	DB *pgxpool.Pool
 }
 
-func (m *BankTransactionModel) SelectAllCreditCardPaymentsReceived() ([]*models.BankTransaction, error) {
+func (m *BankTransactionModel) SelectAllCreditCardPaymentsReceived(
+	ctx context.Context,
+) ([]*models.BankTransaction, error) {
 	stmt := SELECT_BANK_TRANSACTIONS_STMT_PREFIX + `
 		WHERE
 			txs.currency_id = 'CAD' AND
 			txs.description ILIKE ANY (ARRAY['PRE-AUTHORIZED PAYMENT%', 'AUTOMATIC PAYMENT%', 'PAYMENT - THANK YOU%'])
 		ORDER BY txs.date;`
-	rows, err := m.DB.Query(stmt)
+	rows, err := m.DB.Query(ctx, stmt)
 	if err != nil {
 		return nil, err
 	}
@@ -37,13 +42,15 @@ func (m *BankTransactionModel) SelectAllCreditCardPaymentsReceived() ([]*models.
 	return scanBankTransactionRows(rows)
 }
 
-func (m *BankTransactionModel) SelectAllPaymentsMadeToCreditCard() ([]*models.BankTransaction, error) {
+func (m *BankTransactionModel) SelectAllPaymentsMadeToCreditCard(
+	ctx context.Context,
+) ([]*models.BankTransaction, error) {
 	stmt := SELECT_BANK_TRANSACTIONS_STMT_PREFIX + `
 		WHERE
 			txs.currency_id = 'CAD' AND
 			txs.description ILIKE ANY (ARRAY['MISC PAYMENT RBC CREDIT CARD', 'MISC PAYMENT CIBC CPD'])
 		ORDER BY txs.date;`
-	rows, err := m.DB.Query(stmt)
+	rows, err := m.DB.Query(ctx, stmt)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +58,9 @@ func (m *BankTransactionModel) SelectAllPaymentsMadeToCreditCard() ([]*models.Ba
 	return scanBankTransactionRows(rows)
 }
 
-func (m *BankTransactionModel) SelectAllPaymentsMadeToOpaqueCreditCard() ([]*models.BankTransaction, error) {
+func (m *BankTransactionModel) SelectAllPaymentsMadeToOpaqueCreditCard(
+	ctx context.Context,
+) ([]*models.BankTransaction, error) {
 	stmt := SELECT_BANK_TRANSACTIONS_STMT_PREFIX + `
 		LEFT OUTER JOIN book.journal_entry_account_entries AS jentry
 			ON txs.id = jentry.bank_transaction_id
@@ -60,7 +69,7 @@ func (m *BankTransactionModel) SelectAllPaymentsMadeToOpaqueCreditCard() ([]*mod
 			txs.description ILIKE ANY (ARRAY['MISC PAYMENT RBC CREDIT CARD', 'MISC PAYMENT CIBC CPD']) AND
 			jentry.bank_transaction_id IS NULL
 		ORDER BY txs.date;`
-	rows, err := m.DB.Query(stmt)
+	rows, err := m.DB.Query(ctx, stmt)
 	if err != nil {
 		return nil, err
 	}
@@ -68,13 +77,15 @@ func (m *BankTransactionModel) SelectAllPaymentsMadeToOpaqueCreditCard() ([]*mod
 	return scanBankTransactionRows(rows)
 }
 
-func (m *BankTransactionModel) SelectAllNonCreditCardPayments() ([]*models.BankTransaction, error) {
+func (m *BankTransactionModel) SelectAllNonCreditCardPayments(
+	ctx context.Context,
+) ([]*models.BankTransaction, error) {
 	stmt := SELECT_BANK_TRANSACTIONS_STMT_PREFIX + `
 		WHERE
 			txs.currency_id = 'CAD' AND
 			txs.description NOT ILIKE ALL (ARRAY['MISC PAYMENT RBC CREDIT CARD', 'MISC PAYMENT CIBC CPD', 'PRE-AUTHORIZED PAYMENT%', 'AUTOMATIC PAYMENT%', 'PAYMENT - THANK YOU%'])
 		ORDER BY txs.date;`
-	rows, err := m.DB.Query(stmt)
+	rows, err := m.DB.Query(ctx, stmt)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +93,7 @@ func (m *BankTransactionModel) SelectAllNonCreditCardPayments() ([]*models.BankT
 	return scanBankTransactionRows(rows)
 }
 
-func scanBankTransactionRows(rows *sql.Rows) ([]*models.BankTransaction, error) {
+func scanBankTransactionRows(rows pgx.Rows) ([]*models.BankTransaction, error) {
 	txs := []*models.BankTransaction{}
 	for rows.Next() {
 		tx := &models.BankTransaction{}
@@ -108,6 +119,7 @@ func scanBankTransactionRows(rows *sql.Rows) ([]*models.BankTransaction, error) 
 }
 
 func (m *BankTransactionModel) InsertRBC(
+	ctx context.Context,
 	date time.Time,
 	desc, desc2 string,
 	debit, credit float64,
@@ -122,7 +134,7 @@ func (m *BankTransactionModel) InsertRBC(
 		RETURNING id;`
 
 	var id string
-	err := m.DB.QueryRow(stmt,
+	err := m.DB.QueryRow(ctx, stmt,
 		date.Format("2006-01-02"),
 		desc,
 		desc2,
@@ -140,6 +152,7 @@ func (m *BankTransactionModel) InsertRBC(
 }
 
 func (m *BankTransactionModel) InsertCIBC(
+	ctx context.Context,
 	date time.Time,
 	desc string,
 	debit, credit float64,
@@ -152,7 +165,7 @@ func (m *BankTransactionModel) InsertCIBC(
 			(date, description, debit, credit, currency_id, card_number, account_id)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id;`
-	err := m.DB.QueryRow(stmt,
+	err := m.DB.QueryRow(ctx, stmt,
 		date.Format("2006-01-02"),
 		desc,
 		debit,

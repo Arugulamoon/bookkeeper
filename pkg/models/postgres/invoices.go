@@ -1,12 +1,17 @@
 package postgres
 
-import "database/sql"
+import (
+	"context"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
 
 type InvoicesModel struct {
-	DB *sql.DB
+	DB *pgxpool.Pool
 }
 
 func (m *InvoicesModel) Insert(
+	ctx context.Context,
 	dueDate, description string, amount int,
 ) (string, error) {
 	stmt := `
@@ -14,7 +19,7 @@ func (m *InvoicesModel) Insert(
 		VALUES ($1, $2, $3)
 		RETURNING id;`
 	var id string
-	err := m.DB.QueryRow(stmt, dueDate, description, amount).Scan(&id)
+	err := m.DB.QueryRow(ctx, stmt, dueDate, description, amount).Scan(&id)
 	if err != nil {
 		return "", err
 	}

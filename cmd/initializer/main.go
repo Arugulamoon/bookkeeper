@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/csv"
 	"flag"
 	"fmt"
@@ -14,7 +13,7 @@ import (
 	"strconv"
 	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/api/calendar/v3"
 	"google.golang.org/api/option"
 	"gopkg.in/yaml.v3"
@@ -29,14 +28,19 @@ type application struct {
 	errorLog *log.Logger
 	infoLog  *log.Logger
 
-	db *sql.DB
+	DB *pgxpool.Pool
 
 	bankCurrencies   *postgres.BankCurrencyModel
 	banks            *postgres.BankModel
 	bankAccounts     *postgres.BankAccountModel
 	bankTransactions *postgres.BankTransactionModel
 
-	sportsMemberships *postgres.SportsMembershipModel
+	bookCurrencies *postgres.BookCurrencyModel
+	bookAccounts   *postgres.AccountModel
+	bookAssigners  *postgres.AssignerModel
+
+	sportsRegistrations *postgres.SportsRegistrationsModel
+	sportsMemberships   *postgres.SportsMembershipModel
 
 	invoices *postgres.InvoicesModel
 
@@ -83,7 +87,9 @@ func main() {
 	}
 	defer db.Close()
 
-	gcalsvc, err := calendar.NewService(context.Background(),
+	ctx := context.Background()
+
+	gcalsvc, err := calendar.NewService(ctx,
 		option.WithHTTPClient(google.GetClient(cfg.Google.Auth.Dir)))
 	if err != nil {
 		errorLog.Fatalf("Unable to create Calendar service: %v", err)
@@ -93,14 +99,19 @@ func main() {
 		errorLog: errorLog,
 		infoLog:  infoLog,
 
-		db: db,
+		DB: db,
 
 		bankCurrencies:   &postgres.BankCurrencyModel{DB: db},
 		banks:            &postgres.BankModel{DB: db},
 		bankAccounts:     &postgres.BankAccountModel{DB: db},
 		bankTransactions: &postgres.BankTransactionModel{DB: db},
 
-		sportsMemberships: &postgres.SportsMembershipModel{DB: db},
+		bookCurrencies: &postgres.BookCurrencyModel{DB: db},
+		bookAccounts:   &postgres.AccountModel{DB: db},
+		bookAssigners:  &postgres.AssignerModel{DB: db},
+
+		sportsRegistrations: &postgres.SportsRegistrationsModel{DB: db},
+		sportsMemberships:   &postgres.SportsMembershipModel{DB: db},
 
 		invoices: &postgres.InvoicesModel{DB: db},
 
@@ -117,27 +128,29 @@ func main() {
 		},
 	}
 
-	app.initBank(data.Bank)
-	app.initBook(data.Book)
-	app.initSports(data.Sports)
-	app.initSchool(data.School)
+	app.initBank(ctx, data.Bank)
+	app.initBook(ctx, data.Book)
+	app.initSports(ctx, data.Sports)
+	app.initSchool(ctx, data.School)
 }
 
-func (app *application) initBank(data yamlmodels.BankData) {
+func (app *application) initBank(
+	ctx context.Context, data yamlmodels.BankData,
+) {
 	for _, currency := range data.Currencies {
-		_, err := app.bankCurrencies.Insert(currency.Id, currency.Name)
+		_, err := app.bankCurrencies.Insert(ctx, currency.Id, currency.Name)
 		if err != nil {
 			panic(err)
 		}
 	}
 
 	for _, bank := range data.Banks {
-		err := app.banks.Insert(bank.Id, bank.Name)
+		err := app.banks.Insert(ctx, bank.Id, bank.Name)
 		if err != nil {
 			panic(err)
 		}
 		for _, acct := range bank.Accounts {
-			acctId, err := app.bankAccounts.Insert(acct.Name, bank.Id, acct.Type)
+			acctId, err := app.bankAccounts.Insert(ctx, acct.Name, bank.Id, acct.Type)
 			if err != nil {
 				panic(err)
 			}
@@ -169,9 +182,9 @@ func (app *application) initBank(data yamlmodels.BankData) {
 				numInsertedTxs := 0
 				switch bank.Id {
 				case "RBC":
-					numInsertedTxs = app.processRBCTransactions(acctId, rows)
+					numInsertedTxs = app.processRBCTransactions(ctx, acctId, rows)
 				case "CIBC":
-					numInsertedTxs = app.processCIBCTransactions(acctId, rows)
+					numInsertedTxs = app.processCIBCTransactions(ctx, acctId, rows)
 				default:
 					panic("unknown bank")
 				}
@@ -182,7 +195,7 @@ func (app *application) initBank(data yamlmodels.BankData) {
 
 			for _, desc := range acct.PaymentRecdDescs {
 				err := app.bankAccounts.InsertPaymentDescription(
-					acctId, "Received", desc)
+					ctx, acctId, "Received", desc)
 				if err != nil {
 					panic(err)
 				}
@@ -190,7 +203,7 @@ func (app *application) initBank(data yamlmodels.BankData) {
 
 			for _, desc := range acct.PaymentMadeDescs {
 				err := app.bankAccounts.InsertPaymentDescription(
-					acctId, "Made", desc)
+					ctx, acctId, "Made", desc)
 				if err != nil {
 					panic(err)
 				}
@@ -200,6 +213,7 @@ func (app *application) initBank(data yamlmodels.BankData) {
 }
 
 func (app *application) processRBCTransactions(
+	ctx context.Context,
 	acctId string, rows [][]string,
 ) int {
 	rawTxs := rows[1:] // headers in first row; skip them
@@ -233,6 +247,7 @@ func (app *application) processRBCTransactions(
 		}
 
 		id, err := app.bankTransactions.InsertRBC(
+			ctx,
 			tx.TransactionDate,
 			tx.Description, tx.Description2,
 			debit, credit, currency,
@@ -281,6 +296,7 @@ func NewRBCTransaction(row []string) *RBCTransaction {
 }
 
 func (app *application) processCIBCTransactions(
+	ctx context.Context,
 	acctId string, rows [][]string,
 ) int {
 	rawTxs := rows // headers NOT in first row
@@ -290,6 +306,7 @@ func (app *application) processCIBCTransactions(
 	for _, rawTx := range rawTxs {
 		tx := NewCIBCTransaction(rawTx)
 		id, err := app.bankTransactions.InsertCIBC(
+			ctx,
 			tx.Date,
 			tx.Description,
 			tx.Debit, tx.Credit,
@@ -333,10 +350,10 @@ func NewCIBCTransaction(row []string) *CIBCTransaction {
 	}
 }
 
-func (app *application) initBook(data yamlmodels.BookData) {
+func (app *application) initBook(
+	ctx context.Context, data yamlmodels.BookData) {
 	for _, currency := range data.Currencies {
-		currencyModel := &postgres.BookCurrencyModel{DB: app.db}
-		_, err := currencyModel.Insert(currency.Id, currency.Name)
+		_, err := app.bookCurrencies.Insert(ctx, currency.Id, currency.Name)
 		if err != nil {
 			panic(err)
 		}
@@ -345,7 +362,7 @@ func (app *application) initBook(data yamlmodels.BookData) {
 	for _, acct := range data.Accounts {
 		var bankAccountId *string
 		if acct.BankAccount != nil {
-			id, err := app.bankAccounts.GetId(*acct.BankAccount)
+			id, err := app.bankAccounts.GetId(ctx, *acct.BankAccount)
 			if err != nil {
 				panic(err)
 			}
@@ -359,9 +376,8 @@ func (app *application) initBook(data yamlmodels.BookData) {
 			sortOrder = *acct.SortOrder
 		}
 
-		accountModel := &postgres.AccountModel{DB: app.db}
-		_, err := accountModel.Insert(
-			acct.AccountType, acct.Name, bankAccountId, sortOrder,
+		_, err := app.bookAccounts.Insert(
+			ctx, acct.AccountType, acct.Name, bankAccountId, sortOrder,
 		)
 		if err != nil {
 			panic(err)
@@ -369,16 +385,14 @@ func (app *application) initBook(data yamlmodels.BookData) {
 	}
 
 	for _, assigner := range data.Assigners {
-		assignerModel := &postgres.AssignerModel{DB: app.db}
-
-		id, err := assignerModel.Insert(
-			assigner.Name, assigner.AccountType, assigner.Account)
+		id, err := app.bookAssigners.Insert(
+			ctx, assigner.Name, assigner.AccountType, assigner.Account)
 		if err != nil {
 			panic(err)
 		}
 		for _, desc := range assigner.Descriptions {
-			_, err := assignerModel.InsertBankTransactionDescription(
-				desc, id)
+			_, err := app.bookAssigners.InsertBankTransactionDescription(
+				ctx, desc, id)
 			if err != nil {
 				panic(err)
 			}
@@ -386,10 +400,12 @@ func (app *application) initBook(data yamlmodels.BookData) {
 	}
 }
 
-func (app *application) initSports(data yamlmodels.SportsData) {
+func (app *application) initSports(
+	ctx context.Context, data yamlmodels.SportsData,
+) {
 	for _, reg := range data.Registrations {
-		sportsRegModel := &postgres.SportsRegistrationsModel{DB: app.db}
-		_, err := sportsRegModel.Insert(
+		_, err := app.sportsRegistrations.Insert(
+			ctx,
 			reg.Name,
 			reg.Price.Total,
 			reg.Price.Regular,
@@ -410,20 +426,22 @@ func (app *application) initSports(data yamlmodels.SportsData) {
 		}
 	}
 
-	app.initSportsMemberships(data.Memberships)
+	app.initSportsMemberships(ctx, data.Memberships)
 }
 
 func (app *application) initSportsMemberships(
-	memberships []yamlmodels.Membership,
+	ctx context.Context, memberships []yamlmodels.Membership,
 ) {
 	for _, membership := range memberships {
-		membershipId, err := app.sportsMemberships.Insert(membership.Name,
+		membershipId, err := app.sportsMemberships.Insert(ctx, membership.Name,
 			membership.Season.Year, membership.Season.Type, membership.Location)
 		if err != nil {
 			panic(err)
 		}
 		for _, game := range membership.Games {
-			gameId, err := app.sportsMemberships.InsertGame(membershipId,
+			gameId, err := app.sportsMemberships.InsertGame(
+				ctx,
+				membershipId,
 				game.Date, game.Time.Start, game.Opponent, game.Notes, game.Location,
 				game.Event.Id)
 			if err != nil {
@@ -453,7 +471,7 @@ func (app *application) initSportsMemberships(
 						game.Date.Format(time.DateOnly), game.Time.Start, summary, location)
 				}
 
-				_, err = app.sportsMemberships.UpdateGameEventId(gameId, eventId)
+				_, err = app.sportsMemberships.UpdateGameEventId(ctx, gameId, eventId)
 				if err != nil {
 					panic(err)
 				}
@@ -462,16 +480,18 @@ func (app *application) initSportsMemberships(
 	}
 }
 
-func (app *application) initSchool(data yamlmodels.SchoolData) {
+func (app *application) initSchool(
+	ctx context.Context, data yamlmodels.SchoolData,
+) {
 	for _, grade := range data.Grades {
-		err := app.schools.InsertGrade(grade.Id, grade.Name)
+		err := app.schools.InsertGrade(ctx, grade.Id, grade.Name)
 		if err != nil {
 			panic(err)
 		}
 	}
 
 	for _, school := range data.Schools {
-		err := app.schools.InsertSchool(school.Id, school.Name,
+		err := app.schools.InsertSchool(ctx, school.Id, school.Name,
 			school.Address, school.Phone, school.Principal)
 		if err != nil {
 			panic(err)
@@ -479,7 +499,7 @@ func (app *application) initSchool(data yamlmodels.SchoolData) {
 	}
 
 	for _, schoolYear := range data.SchoolYears {
-		err := app.schools.InsertSchoolYear(schoolYear.Year,
+		err := app.schools.InsertSchoolYear(ctx, schoolYear.Year,
 			schoolYear.SchoolId, schoolYear.GradeId,
 			schoolYear.Teacher, schoolYear.Education)
 		if err != nil {
@@ -488,11 +508,12 @@ func (app *application) initSchool(data yamlmodels.SchoolData) {
 	}
 
 	for _, inv := range data.Invoices {
-		invId, err := app.invoices.Insert(inv.DueDate, inv.Description, inv.Amount)
+		invId, err := app.invoices.Insert(ctx, inv.DueDate, inv.Description, inv.Amount)
 		if err != nil {
 			panic(err)
 		}
 		schoolInvId, err := app.schoolExpenses.InsertInvoice(
+			ctx,
 			invId, inv.SchoolYear, inv.School, inv.Grade,
 			inv.Event.Id, inv.DatePaid, inv.EventMarkedPaid)
 		if err != nil {
@@ -504,7 +525,7 @@ func (app *application) initSchool(data yamlmodels.SchoolData) {
 				inv.SchoolYear, inv.Grade, inv.Description, inv.Amount/100)
 			eventId := app.expenseCal.CreateAllDayEvent(
 				data.Calendars.Expenses, inv.DueDate, summary)
-			_, err = app.schoolExpenses.UpdateInvoiceEventId(schoolInvId, eventId)
+			_, err = app.schoolExpenses.UpdateInvoiceEventId(ctx, schoolInvId, eventId)
 			if err != nil {
 				panic(err)
 			}
@@ -513,10 +534,11 @@ func (app *application) initSchool(data yamlmodels.SchoolData) {
 		if inv.Event.Id != "" && inv.DatePaid != nil && !inv.EventMarkedPaid {
 			// mark paid
 			app.expenseCal.MarkEventPaid(data.Calendars.Expenses, inv.Event.Id)
-			app.schoolExpenses.UpdateInvoiceEventMarkedPaid(schoolInvId)
+			app.schoolExpenses.UpdateInvoiceEventMarkedPaid(ctx, schoolInvId)
 		}
 		if inv.Reimbursement != nil {
 			_, err = app.schoolExpenses.InsertReimbursement(
+				ctx,
 				schoolInvId,
 				inv.Reimbursement.Split,
 				inv.Reimbursement.Amount,
@@ -528,15 +550,26 @@ func (app *application) initSchool(data yamlmodels.SchoolData) {
 	}
 }
 
-func openDB(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", dsn)
+func openDB(dsn string) (*pgxpool.Pool, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Optional: Configure pool settings (e.g., max connections, lifetime)
+	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Unable to parse database config: %v", err)
 	}
-	if err = db.Ping(); err != nil {
-		return nil, err
+	config.MaxConns = 10
+	config.MaxConnLifetime = 30 * time.Minute
+	config.MinConns = 2
+
+	// Establish the connection pool
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to connect to database: %v", err)
 	}
-	return db, nil
+
+	return pool, nil
 }
 
 func castToFloat(s string) float64 {

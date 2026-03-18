@@ -1,18 +1,22 @@
 package postgres
 
 import (
-	"database/sql"
+	"context"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Arugulamoon/bookkeeper/pkg/models"
 )
 
 type BookCurrencyModel struct {
-	DB *sql.DB
+	DB *pgxpool.Pool
 }
 
-func (m *BookCurrencyModel) SelectAll() ([]models.Currency, error) {
+func (m *BookCurrencyModel) SelectAll(
+	ctx context.Context,
+) ([]models.Currency, error) {
 	stmt := `SELECT id, name FROM book.currencies;`
-	rows, err := m.DB.Query(stmt)
+	rows, err := m.DB.Query(ctx, stmt)
 	if err != nil {
 		return nil, err
 	}
@@ -36,17 +40,14 @@ func (m *BookCurrencyModel) SelectAll() ([]models.Currency, error) {
 	return currencies, nil
 }
 
-func (m *BookCurrencyModel) Insert(id, name string) (int, error) {
+func (m *BookCurrencyModel) Insert(
+	ctx context.Context,
+	id, name string,
+) (int, error) {
 	stmt := `INSERT INTO book.currencies (id, name) VALUES ($1, $2);`
-	res, err := m.DB.Exec(stmt, id, name)
+	res, err := m.DB.Exec(ctx, stmt, id, name)
 	if err != nil {
 		return 0, err
 	}
-
-	numInserted, err := res.RowsAffected()
-	if err != nil {
-		return 0, err
-	}
-
-	return int(numInserted), nil
+	return int(res.RowsAffected()), nil
 }

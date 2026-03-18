@@ -1,23 +1,23 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"net/http"
 
+	"github.com/labstack/echo/v5"
+
 	"github.com/Arugulamoon/bookkeeper/pkg/models"
 	"github.com/Arugulamoon/bookkeeper/pkg/models/postgres"
-	"github.com/labstack/echo/v5"
 )
 
 type SportsMembershipHandler struct {
-	DB *sql.DB
+	SportsMemberships *postgres.SportsMembershipModel
 }
 
 func (h *SportsMembershipHandler) List() echo.HandlerFunc {
 	return func(c *echo.Context) error {
-		m := &postgres.SportsMembershipModel{DB: h.DB}
-		memberships, err := m.SelectAll()
+		memberships, err := h.SportsMemberships.SelectAll(
+			c.Request().Context())
 		if err != nil {
 			return err
 		}
@@ -39,9 +39,9 @@ func (h *SportsMembershipHandler) Show() echo.HandlerFunc {
 			return c.String(http.StatusBadRequest, "bad request")
 		}
 
-		m := &postgres.SportsMembershipModel{DB: h.DB}
-
-		membership, err := m.Select(data.Id)
+		membership, err := h.SportsMemberships.Select(
+			c.Request().Context(),
+			data.Id)
 		if err != nil {
 			if errors.Is(err, models.ErrNoRecord) {
 				return c.String(http.StatusNotFound, "not found")
@@ -51,7 +51,9 @@ func (h *SportsMembershipHandler) Show() echo.HandlerFunc {
 			}
 		}
 
-		games, err := m.SelectAllGames(data.Id)
+		games, err := h.SportsMemberships.SelectAllGames(
+			c.Request().Context(),
+			data.Id)
 		if err != nil {
 			return err
 		}

@@ -1,11 +1,15 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Arugulamoon/bookkeeper/pkg/models"
 )
@@ -40,16 +44,17 @@ const SELECT_STATEMENT_PREFIX = `
 		ON txs.account_id = bankaccts.id`
 
 type JournalAccountEntryModel struct {
-	DB *sql.DB
+	DB *pgxpool.Pool
 }
 
 func (m *JournalAccountEntryModel) SelectAllByAssignerId(
+	ctx context.Context,
 	assignerId string,
 ) ([]*models.JournalAccountEntry, error) {
 	stmt := SELECT_STATEMENT_PREFIX + `
 		WHERE acctentry.assigner_id = $1
 		ORDER BY jentry.date DESC;`
-	rows, err := m.DB.Query(stmt, assignerId)
+	rows, err := m.DB.Query(ctx, stmt, assignerId)
 	if err != nil {
 		return nil, err
 	}
@@ -58,12 +63,13 @@ func (m *JournalAccountEntryModel) SelectAllByAssignerId(
 }
 
 func (m *JournalAccountEntryModel) SelectAllByAccountId(
+	ctx context.Context,
 	acctType, acctName string,
 ) ([]*models.JournalAccountEntry, error) {
 	stmt := SELECT_STATEMENT_PREFIX + `
 		WHERE acctentry.account_type = $1 AND acctentry.account_name = $2
 		ORDER BY jentry.date DESC;`
-	rows, err := m.DB.Query(stmt, acctType, acctName)
+	rows, err := m.DB.Query(ctx, stmt, acctType, acctName)
 	if err != nil {
 		return nil, err
 	}
@@ -72,13 +78,14 @@ func (m *JournalAccountEntryModel) SelectAllByAccountId(
 }
 
 func (m *JournalAccountEntryModel) SelectAllByLikeDescription(
+	ctx context.Context,
 	str string,
 ) ([]*models.JournalAccountEntry, error) {
 	stmt := SELECT_STATEMENT_PREFIX + `
 		WHERE
 			accts.account_type = 'Expense' AND
 			jentry.description ILIKE CONCAT('%', $1::text, '%');`
-	rows, err := m.DB.Query(stmt, str)
+	rows, err := m.DB.Query(ctx, stmt, str)
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +94,7 @@ func (m *JournalAccountEntryModel) SelectAllByLikeDescription(
 }
 
 func (m *JournalAccountEntryModel) SelectAllByAccountForYear(
+	ctx context.Context,
 	acctType, acctName string,
 	year int,
 ) ([]*models.JournalAccountEntry, error) {
@@ -97,13 +105,14 @@ func (m *JournalAccountEntryModel) SelectAllByAccountForYear(
 
 	endDate := startDate.AddDate(1, 0, -1) // add a year and subtract a day
 
-	return m.SelectAllByAccountForDateRange(acctType, acctName,
+	return m.SelectAllByAccountForDateRange(ctx, acctType, acctName,
 		startDate.Format("2006-01-02"),
 		endDate.Format("2006-01-02"),
 	)
 }
 
 func (m *JournalAccountEntryModel) SelectAllByAccountForMonth(
+	ctx context.Context,
 	acctType, acctName string,
 	year, month int,
 ) ([]*models.JournalAccountEntry, error) {
@@ -120,13 +129,14 @@ func (m *JournalAccountEntryModel) SelectAllByAccountForMonth(
 
 	endDate := startDate.AddDate(0, 1, -1) // add a month and subtract a day
 
-	return m.SelectAllByAccountForDateRange(acctType, acctName,
+	return m.SelectAllByAccountForDateRange(ctx, acctType, acctName,
 		startDate.Format("2006-01-02"),
 		endDate.Format("2006-01-02"),
 	)
 }
 
 func (m *JournalAccountEntryModel) SelectAllByAccountForDateRange(
+	ctx context.Context,
 	acctType, acctName string,
 	startDate, endDate string,
 ) ([]*models.JournalAccountEntry, error) {
@@ -137,7 +147,7 @@ func (m *JournalAccountEntryModel) SelectAllByAccountForDateRange(
 			jentry.date >= $3::date AND
 			jentry.date <= $4::date
 		ORDER BY jentry.date, jentry.description;`
-	rows, err := m.DB.Query(stmt, acctType, acctName, startDate, endDate)
+	rows, err := m.DB.Query(ctx, stmt, acctType, acctName, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +155,7 @@ func (m *JournalAccountEntryModel) SelectAllByAccountForDateRange(
 	return scanRows(rows)
 }
 
-func scanRows(rows *sql.Rows) ([]*models.JournalAccountEntry, error) {
+func scanRows(rows pgx.Rows) ([]*models.JournalAccountEntry, error) {
 	entries := []*models.JournalAccountEntry{}
 	for rows.Next() {
 		entry := &models.JournalAccountEntry{}
@@ -177,11 +187,13 @@ func scanRows(rows *sql.Rows) ([]*models.JournalAccountEntry, error) {
 	return entries, nil
 }
 
-func (m *JournalAccountEntryModel) SelectAllAlreadyImportedBankTransactionIds() ([]string, error) {
+func (m *JournalAccountEntryModel) SelectAllAlreadyImportedBankTransactionIds(
+	ctx context.Context,
+) ([]string, error) {
 	stmt := `
 		SELECT DISTINCT bank_transaction_id
 		FROM book.journal_entry_account_entries;`
-	rows, err := m.DB.Query(stmt)
+	rows, err := m.DB.Query(ctx, stmt)
 	if err != nil {
 		return nil, err
 	}
@@ -200,11 +212,14 @@ func (m *JournalAccountEntryModel) SelectAllAlreadyImportedBankTransactionIds() 
 	return ids, nil
 }
 
-func (m *JournalAccountEntryModel) Select(id string) (*models.JournalAccountEntry, error) {
+func (m *JournalAccountEntryModel) Select(
+	ctx context.Context,
+	id string,
+) (*models.JournalAccountEntry, error) {
 	stmt := SELECT_STATEMENT_PREFIX + `
 		WHERE acctentry.id = $1;`
 	entry := &models.JournalAccountEntry{}
-	err := m.DB.QueryRow(stmt, id).Scan(
+	err := m.DB.QueryRow(ctx, stmt, id).Scan(
 		&entry.Id,
 		&entry.JournalEntryId,
 		&entry.Date,
@@ -231,6 +246,7 @@ func (m *JournalAccountEntryModel) Select(id string) (*models.JournalAccountEntr
 }
 
 func (m *JournalAccountEntryModel) Insert(
+	ctx context.Context,
 	jEntryId, balType string,
 	assignerId *string,
 	acctType, acctName string,
@@ -244,7 +260,7 @@ func (m *JournalAccountEntryModel) Insert(
 		RETURNING id;`
 
 	var id string
-	err := m.DB.QueryRow(stmt, jEntryId, balType, assignerId, acctType, acctName, amount, bankTxId).Scan(&id)
+	err := m.DB.QueryRow(ctx, stmt, jEntryId, balType, assignerId, acctType, acctName, amount, bankTxId).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -253,46 +269,42 @@ func (m *JournalAccountEntryModel) Insert(
 }
 
 // TODO (10): Implement Batch
-func (m *JournalAccountEntryModel) UpdateAccount(id, acctType, acctName string) (string, error) {
+func (m *JournalAccountEntryModel) UpdateAccount(
+	ctx context.Context,
+	id, acctType, acctName string,
+) (string, error) {
 	stmt := `
 		UPDATE book.journal_entry_account_entries
 		SET account_type = $2, account_name = $3
 		WHERE id = $1;`
-	res, err := m.DB.Exec(stmt, id, acctType, acctName)
+	res, err := m.DB.Exec(ctx, stmt, id, acctType, acctName)
 	if err != nil {
 		return "", err
 	}
 
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return "", err
-	}
-
-	if rowsAffected != 1 {
-		return "", fmt.Errorf("incorrect number of rows (%d) affected", rowsAffected)
+	if res.RowsAffected() != 1 {
+		return "", fmt.Errorf("incorrect number of rows (%d) affected", res.RowsAffected())
 	}
 
 	return id, nil
 }
 
 // TODO (10): Implement Batch
-func (m *JournalAccountEntryModel) UpdateAmount(id string, amount float64) (string, error) {
+func (m *JournalAccountEntryModel) UpdateAmount(
+	ctx context.Context,
+	id string, amount float64,
+) (string, error) {
 	stmt := `
 		UPDATE book.journal_entry_account_entries
 		SET amount = $2
 		WHERE id = $1;`
-	res, err := m.DB.Exec(stmt, id, amount)
+	res, err := m.DB.Exec(ctx, stmt, id, amount)
 	if err != nil {
 		return "", err
 	}
 
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return "", err
-	}
-
-	if rowsAffected != 1 {
-		return "", fmt.Errorf("incorrect number of rows (%d) affected", rowsAffected)
+	if res.RowsAffected() != 1 {
+		return "", fmt.Errorf("incorrect number of rows (%d) affected", res.RowsAffected())
 	}
 
 	return id, nil

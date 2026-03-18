@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"net/http"
 	"strings"
@@ -13,13 +12,14 @@ import (
 )
 
 type AssignerHandler struct {
-	DB *sql.DB
+	BookAccounts              *postgres.AccountModel
+	BookAssigners             *postgres.AssignerModel
+	BookJournalAccountEntries *postgres.JournalAccountEntryModel
 }
 
 func (h *AssignerHandler) List() echo.HandlerFunc {
 	return func(c *echo.Context) error {
-		assignerModel := &postgres.AssignerModel{DB: h.DB}
-		assgnrs, err := assignerModel.SelectAll()
+		assgnrs, err := h.BookAssigners.SelectAll(c.Request().Context())
 		if err != nil {
 			return c.String(http.StatusInternalServerError,
 				"internal server error")
@@ -43,15 +43,14 @@ func (h *AssignerHandler) CreateForm() echo.HandlerFunc {
 			return c.String(http.StatusBadRequest, "bad request")
 		}
 
-		accountModel := &postgres.AccountModel{DB: h.DB}
-		accts, err := accountModel.SelectAll()
+		accts, err := h.BookAccounts.SelectAll(c.Request().Context())
 		if err != nil {
 			return c.String(http.StatusInternalServerError,
 				"internal server error")
 		}
 
-		jAcctEntryModel := &postgres.JournalAccountEntryModel{DB: h.DB}
-		entries, err := jAcctEntryModel.SelectAllByLikeDescription(
+		entries, err := h.BookJournalAccountEntries.SelectAllByLikeDescription(
+			c.Request().Context(),
 			data.SearchedFor)
 		if err != nil {
 			return c.String(http.StatusInternalServerError,
@@ -82,16 +81,15 @@ func (h *AssignerHandler) Create() echo.HandlerFunc {
 
 		splittedAcct := strings.Split(data.Acct, "#") // AccountType#Name
 
-		assignerModel := &postgres.AssignerModel{DB: h.DB}
-
-		assignerId, err := assignerModel.Insert(
+		assignerId, err := h.BookAssigners.Insert(c.Request().Context(),
 			data.Name, splittedAcct[0], splittedAcct[1])
 		if err != nil {
 			return c.String(http.StatusInternalServerError,
 				"internal server error")
 		}
 
-		_, err = assignerModel.InsertBankTransactionDescription(
+		_, err = h.BookAssigners.InsertBankTransactionDescription(
+			c.Request().Context(),
 			data.BankTxDesc, assignerId)
 		if err != nil {
 			return c.String(http.StatusInternalServerError,
@@ -113,8 +111,8 @@ func (h *AssignerHandler) Show() echo.HandlerFunc {
 			return c.String(http.StatusBadRequest, "bad request")
 		}
 
-		assignerModel := &postgres.AssignerModel{DB: h.DB}
-		assgnr, err := assignerModel.Select(data.Id)
+		assgnr, err := h.BookAssigners.Select(c.Request().Context(),
+			data.Id)
 		if err != nil {
 			if errors.Is(err, models.ErrNoRecord) {
 				return c.String(http.StatusNotFound, "not found")
@@ -124,8 +122,9 @@ func (h *AssignerHandler) Show() echo.HandlerFunc {
 			}
 		}
 
-		jAcctEntryModel := &postgres.JournalAccountEntryModel{DB: h.DB}
-		entries, err := jAcctEntryModel.SelectAllByAssignerId(data.Id)
+		entries, err := h.BookJournalAccountEntries.SelectAllByAssignerId(
+			c.Request().Context(),
+			data.Id)
 		if err != nil {
 			return c.String(http.StatusInternalServerError,
 				"internal server error")

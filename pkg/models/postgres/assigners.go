@@ -1,13 +1,15 @@
 package postgres
 
 import (
-	"database/sql"
+	"context"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Arugulamoon/bookkeeper/pkg/models"
 )
 
 type AssignerModel struct {
-	DB *sql.DB
+	DB *pgxpool.Pool
 }
 
 type assignerDesc struct {
@@ -18,7 +20,9 @@ type assignerDesc struct {
 	AccountName                string
 }
 
-func (m *AssignerModel) SelectAll() ([]*models.Assigner, error) {
+func (m *AssignerModel) SelectAll(
+	ctx context.Context,
+) ([]*models.Assigner, error) {
 	stmt := `
 		SELECT
 			assigners.id,
@@ -30,7 +34,7 @@ func (m *AssignerModel) SelectAll() ([]*models.Assigner, error) {
 		INNER JOIN book.assigners AS assigners
 			ON descs.assigner_id = assigners.id
 		ORDER BY assigners.name;`
-	rows, err := m.DB.Query(stmt)
+	rows, err := m.DB.Query(ctx, stmt)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +88,10 @@ func (m *AssignerModel) SelectAll() ([]*models.Assigner, error) {
 	return assigners, nil
 }
 
-func (m *AssignerModel) Select(id string) (*models.Assigner, error) {
+func (m *AssignerModel) Select(
+	ctx context.Context,
+	id string,
+) (*models.Assigner, error) {
 	stmt := `
 		SELECT
 			assigners.id,
@@ -96,7 +103,7 @@ func (m *AssignerModel) Select(id string) (*models.Assigner, error) {
 		INNER JOIN book.assigners AS assigners
 			ON descs.assigner_id = assigners.id
 		WHERE assigners.id = $1;`
-	rows, err := m.DB.Query(stmt, id)
+	rows, err := m.DB.Query(ctx, stmt, id)
 	if err != nil {
 		return nil, err
 	}
@@ -142,13 +149,16 @@ func (m *AssignerModel) Select(id string) (*models.Assigner, error) {
 	return assigner, nil
 }
 
-func (m *AssignerModel) Insert(name, acctType, acctName string) (string, error) {
+func (m *AssignerModel) Insert(
+	ctx context.Context,
+	name, acctType, acctName string,
+) (string, error) {
 	stmt := `
 		INSERT INTO book.assigners (name, account_type, account_name)
 		VALUES ($1, $2, $3)
 		RETURNING id;`
 	var id string
-	err := m.DB.QueryRow(stmt, name, acctType, acctName).Scan(&id)
+	err := m.DB.QueryRow(ctx, stmt, name, acctType, acctName).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -158,6 +168,7 @@ func (m *AssignerModel) Insert(name, acctType, acctName string) (string, error) 
 
 // TODO: Replace with Insert
 func (m *AssignerModel) InsertBankTransactionDescription(
+	ctx context.Context,
 	desc, assignerId string,
 ) (string, error) {
 	stmt := `
@@ -166,7 +177,7 @@ func (m *AssignerModel) InsertBankTransactionDescription(
 		VALUES ($1, $2)
 		RETURNING id;`
 	var id string
-	err := m.DB.QueryRow(stmt, desc, assignerId).Scan(&id)
+	err := m.DB.QueryRow(ctx, stmt, desc, assignerId).Scan(&id)
 	if err != nil {
 		return "", err
 	}

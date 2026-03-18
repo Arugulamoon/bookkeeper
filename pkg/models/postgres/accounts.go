@@ -1,17 +1,22 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"errors"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Arugulamoon/bookkeeper/pkg/models"
 )
 
 type AccountModel struct {
-	DB *sql.DB
+	DB *pgxpool.Pool
 }
 
-func (m *AccountModel) SelectAll() ([]*models.Account, error) {
+func (m *AccountModel) SelectAll(
+	ctx context.Context,
+) ([]*models.Account, error) {
 	stmt := `
 		SELECT
 			accts.account_type,
@@ -22,7 +27,7 @@ func (m *AccountModel) SelectAll() ([]*models.Account, error) {
 		INNER JOIN book.account_types AS accttypes
 			ON accts.account_type = accttypes.name
 		ORDER BY accttypes.sort_order, accttypes.name, accts.sort_order, accts.name;`
-	rows, err := m.DB.Query(stmt)
+	rows, err := m.DB.Query(ctx, stmt)
 	if err != nil {
 		return nil, err
 	}
@@ -51,6 +56,7 @@ func (m *AccountModel) SelectAll() ([]*models.Account, error) {
 }
 
 func (m *AccountModel) SelectAllNamesByAccountType(
+	ctx context.Context,
 	acctType string,
 ) ([]string, error) {
 	stmt := `
@@ -58,7 +64,7 @@ func (m *AccountModel) SelectAllNamesByAccountType(
 		FROM book.accounts
 		WHERE account_type = $1
 		ORDER BY sort_order, name;`
-	rows, err := m.DB.Query(stmt, acctType)
+	rows, err := m.DB.Query(ctx, stmt, acctType)
 	if err != nil {
 		return nil, err
 	}
@@ -82,6 +88,7 @@ func (m *AccountModel) SelectAllNamesByAccountType(
 }
 
 func (m *AccountModel) Select(
+	ctx context.Context,
 	acctType, acctName string,
 ) (*models.Account, error) {
 	stmt := `
@@ -89,7 +96,7 @@ func (m *AccountModel) Select(
 		FROM book.accounts
 		WHERE account_type = $1 AND name = $2;`
 	acct := &models.Account{}
-	err := m.DB.QueryRow(stmt, acctType, acctName).Scan(
+	err := m.DB.QueryRow(ctx, stmt, acctType, acctName).Scan(
 		&acct.AccountType,
 		&acct.Name,
 		&acct.BankAccountId,
@@ -106,6 +113,7 @@ func (m *AccountModel) Select(
 }
 
 func (m *AccountModel) SelectByBankAccountId(
+	ctx context.Context,
 	bankAcctId string,
 ) (*models.Account, error) {
 	stmt := `
@@ -113,7 +121,7 @@ func (m *AccountModel) SelectByBankAccountId(
 		FROM book.accounts
 		WHERE bank_account_id = $1;`
 	acct := &models.Account{}
-	err := m.DB.QueryRow(stmt, bankAcctId).Scan(
+	err := m.DB.QueryRow(ctx, stmt, bankAcctId).Scan(
 		&acct.AccountType,
 		&acct.Name,
 		&acct.BankAccountId,
@@ -130,21 +138,16 @@ func (m *AccountModel) SelectByBankAccountId(
 }
 
 func (m *AccountModel) Insert(
+	ctx context.Context,
 	acctType, name string, bankAccountId *string, sortOrder int,
 ) (int, error) {
 	stmt := `
 		INSERT INTO book.accounts
 			(account_type, name, bank_account_id, sort_order)
 		VALUES ($1, $2, $3, $4);`
-	res, err := m.DB.Exec(stmt, acctType, name, bankAccountId, sortOrder)
+	res, err := m.DB.Exec(ctx, stmt, acctType, name, bankAccountId, sortOrder)
 	if err != nil {
 		return 0, err
 	}
-
-	numInserted, err := res.RowsAffected()
-	if err != nil {
-		return 0, err
-	}
-
-	return int(numInserted), nil
+	return int(res.RowsAffected()), nil
 }

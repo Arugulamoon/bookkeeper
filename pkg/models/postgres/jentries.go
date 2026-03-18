@@ -1,15 +1,18 @@
 package postgres
 
 import (
-	"database/sql"
+	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type JournalEntryModel struct {
-	DB *sql.DB
+	DB *pgxpool.Pool
 }
 
 func (m *JournalEntryModel) Insert(
+	ctx context.Context,
 	date time.Time, desc string,
 ) (string, error) {
 	stmt := `
@@ -17,7 +20,7 @@ func (m *JournalEntryModel) Insert(
 		VALUES ($1, $2)
 		RETURNING id;`
 	var id string
-	err := m.DB.QueryRow(stmt, date, desc).Scan(&id)
+	err := m.DB.QueryRow(ctx, stmt, date, desc).Scan(&id)
 	if err != nil {
 		return "", err
 	}

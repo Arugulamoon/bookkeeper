@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,13 +12,13 @@ import (
 )
 
 type AccountHandler struct {
-	DB *sql.DB
+	BookAccounts              *postgres.AccountModel
+	BookJournalAccountEntries *postgres.JournalAccountEntryModel
 }
 
 func (h *AccountHandler) List() echo.HandlerFunc {
 	return func(c *echo.Context) error {
-		accountModel := &postgres.AccountModel{DB: h.DB}
-		accts, err := accountModel.SelectAll()
+		accts, err := h.BookAccounts.SelectAll(c.Request().Context())
 		if err != nil {
 			return c.String(http.StatusInternalServerError,
 				"internal server error")
@@ -56,8 +55,7 @@ func (h *AccountHandler) Create() echo.HandlerFunc {
 			data.SortOrder = 1000
 		}
 
-		accountModel := &postgres.AccountModel{DB: h.DB}
-		_, err := accountModel.Insert(
+		_, err := h.BookAccounts.Insert(c.Request().Context(),
 			data.AcctType, data.Name, nil, data.SortOrder)
 		if err != nil {
 			return err
@@ -80,8 +78,8 @@ func (h *AccountHandler) Show() echo.HandlerFunc {
 			return c.String(http.StatusBadRequest, "bad request")
 		}
 
-		accountModel := &postgres.AccountModel{DB: h.DB}
-		acct, err := accountModel.Select(data.AcctType, data.AcctName)
+		acct, err := h.BookAccounts.Select(c.Request().Context(),
+			data.AcctType, data.AcctName)
 		if err != nil {
 			if errors.Is(err, models.ErrNoRecord) {
 				return c.String(http.StatusNotFound, "not found")
@@ -91,8 +89,8 @@ func (h *AccountHandler) Show() echo.HandlerFunc {
 			}
 		}
 
-		jAcctEntryModel := &postgres.JournalAccountEntryModel{DB: h.DB}
-		entries, err := jAcctEntryModel.SelectAllByAccountId(
+		entries, err := h.BookJournalAccountEntries.SelectAllByAccountId(
+			c.Request().Context(),
 			data.AcctType, data.AcctName)
 		if err != nil {
 			return c.String(http.StatusInternalServerError,

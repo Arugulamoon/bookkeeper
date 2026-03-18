@@ -1,7 +1,7 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -9,6 +9,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/lib/pq"
 
 	"github.com/Arugulamoon/bookkeeper/pkg/config"
@@ -20,7 +21,7 @@ type application struct {
 	errorLog *log.Logger
 	infoLog  *log.Logger
 
-	db *sql.DB
+	DB *pgxpool.Pool
 
 	bankTransactions *postgres.BankTransactionModel
 	accounts         *postgres.AccountModel
@@ -52,11 +53,13 @@ func main() {
 	}
 	defer db.Close()
 
+	ctx := context.Background()
+
 	app := &application{
 		errorLog: errorLog,
 		infoLog:  infoLog,
 
-		db: db,
+		DB: db,
 
 		bankTransactions: &postgres.BankTransactionModel{DB: db},
 		accounts:         &postgres.AccountModel{DB: db},
@@ -64,27 +67,29 @@ func main() {
 		jAcctEntries:     &postgres.JournalAccountEntryModel{DB: db},
 	}
 
-	app.loadCreditCardPaymentBankTransactions()
-	app.loadOpaqueCreditCardPaymentBankTransactions()
-	app.loadNonCreditCardPaymentBankTransactions()
+	app.loadCreditCardPaymentBankTransactions(ctx)
+	app.loadOpaqueCreditCardPaymentBankTransactions(ctx)
+	app.loadNonCreditCardPaymentBankTransactions(ctx)
 }
 
 // TODO: Rewrite queries with filtering using sql
-func (app *application) loadCreditCardPaymentBankTransactions() {
+func (app *application) loadCreditCardPaymentBankTransactions(
+	ctx context.Context,
+) {
 	numInserted := 0
 
-	alreadyImported, err := app.jAcctEntries.SelectAllAlreadyImportedBankTransactionIds()
+	alreadyImported, err := app.jAcctEntries.SelectAllAlreadyImportedBankTransactionIds(ctx)
 	if err != nil {
 		panic(err)
 	}
 
-	fetchedReceived, err := app.bankTransactions.SelectAllCreditCardPaymentsReceived()
+	fetchedReceived, err := app.bankTransactions.SelectAllCreditCardPaymentsReceived(ctx)
 	if err != nil {
 		panic(err)
 	}
 	filteredReceived := filterAlreadyImportedBankTransactions(fetchedReceived, alreadyImported)
 
-	fetchedPaid, err := app.bankTransactions.SelectAllPaymentsMadeToCreditCard()
+	fetchedPaid, err := app.bankTransactions.SelectAllPaymentsMadeToCreditCard(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -93,7 +98,8 @@ func (app *application) loadCreditCardPaymentBankTransactions() {
 	for _, paid := range filteredPaid {
 		for _, received := range filteredReceived {
 			if paid.Credit == received.Debit {
-				numInserted += app.loadCreditCardPaymentBankTransaction(received, paid)
+				numInserted += app.loadCreditCardPaymentBankTransaction(
+					ctx, received, paid)
 			}
 		}
 	}
@@ -102,44 +108,48 @@ func (app *application) loadCreditCardPaymentBankTransactions() {
 		len(fetchedReceived), len(fetchedPaid), len(filteredReceived), len(filteredPaid), numInserted)
 }
 
-func (app *application) loadOpaqueCreditCardPaymentBankTransactions() {
+func (app *application) loadOpaqueCreditCardPaymentBankTransactions(
+	ctx context.Context,
+) {
 	numInserted := 0
 
-	alreadyImported, err := app.jAcctEntries.SelectAllAlreadyImportedBankTransactionIds()
+	alreadyImported, err := app.jAcctEntries.SelectAllAlreadyImportedBankTransactionIds(ctx)
 	if err != nil {
 		panic(err)
 	}
 
-	fetchedPaid, err := app.bankTransactions.SelectAllPaymentsMadeToOpaqueCreditCard()
+	fetchedPaid, err := app.bankTransactions.SelectAllPaymentsMadeToOpaqueCreditCard(ctx)
 	if err != nil {
 		panic(err)
 	}
 	filteredPaid := filterAlreadyImportedBankTransactions(fetchedPaid, alreadyImported)
 
 	for _, tx := range filteredPaid {
-		numInserted += app.loadOpaqueCreditCardPaymentBankTransaction(tx)
+		numInserted += app.loadOpaqueCreditCardPaymentBankTransaction(ctx, tx)
 	}
 
 	fmt.Printf("Fetched %d Opaque CC payments made, filtered down to %d and inserted %d bank transactions into journal\n",
 		len(fetchedPaid), len(filteredPaid), numInserted)
 }
 
-func (app *application) loadNonCreditCardPaymentBankTransactions() {
+func (app *application) loadNonCreditCardPaymentBankTransactions(
+	ctx context.Context,
+) {
 	numInserted := 0
 
-	alreadyImported, err := app.jAcctEntries.SelectAllAlreadyImportedBankTransactionIds()
+	alreadyImported, err := app.jAcctEntries.SelectAllAlreadyImportedBankTransactionIds(ctx)
 	if err != nil {
 		panic(err)
 	}
 
-	fetched, err := app.bankTransactions.SelectAllNonCreditCardPayments()
+	fetched, err := app.bankTransactions.SelectAllNonCreditCardPayments(ctx)
 	if err != nil {
 		panic(err)
 	}
 	filtered := filterAlreadyImportedBankTransactions(fetched, alreadyImported)
 
 	for _, tx := range filtered {
-		numInserted += app.loadNonCreditCardPaymentBankTransaction(tx)
+		numInserted += app.loadNonCreditCardPaymentBankTransaction(ctx, tx)
 	}
 
 	fmt.Printf("Fetched %d, filtered down to %d and inserted %d bank transactions into journal\n",
@@ -147,13 +157,16 @@ func (app *application) loadNonCreditCardPaymentBankTransactions() {
 }
 
 func (app *application) loadCreditCardPaymentBankTransaction(
+	ctx context.Context,
 	receivedTx, paidTx *models.BankTransaction,
 ) int {
-	debitAccount, err := app.accounts.SelectByBankAccountId(receivedTx.AccountId)
+	debitAccount, err := app.accounts.SelectByBankAccountId(
+		ctx, receivedTx.AccountId)
 	if err != nil {
 		panic(err)
 	}
-	creditAccount, err := app.accounts.SelectByBankAccountId(paidTx.AccountId)
+	creditAccount, err := app.accounts.SelectByBankAccountId(
+		ctx, paidTx.AccountId)
 	if err != nil {
 		panic(err)
 	}
@@ -174,7 +187,7 @@ func (app *application) loadCreditCardPaymentBankTransaction(
 		},
 	}
 
-	numInserted, err := app.insertJournalEntry(jEntry)
+	numInserted, err := app.insertJournalEntry(ctx, jEntry)
 	if err != nil {
 		panic(err)
 	}
@@ -182,9 +195,10 @@ func (app *application) loadCreditCardPaymentBankTransaction(
 }
 
 func (app *application) loadOpaqueCreditCardPaymentBankTransaction(
+	ctx context.Context,
 	tx *models.BankTransaction,
 ) int {
-	creditAccount, err := app.accounts.SelectByBankAccountId(tx.AccountId)
+	creditAccount, err := app.accounts.SelectByBankAccountId(ctx, tx.AccountId)
 	if err != nil {
 		panic(err)
 	}
@@ -205,7 +219,7 @@ func (app *application) loadOpaqueCreditCardPaymentBankTransaction(
 		},
 	}
 
-	numInserted, err := app.insertJournalEntry(jEntry)
+	numInserted, err := app.insertJournalEntry(ctx, jEntry)
 	if err != nil {
 		panic(err)
 	}
@@ -213,9 +227,10 @@ func (app *application) loadOpaqueCreditCardPaymentBankTransaction(
 }
 
 func (app *application) loadNonCreditCardPaymentBankTransaction(
+	ctx context.Context,
 	tx *models.BankTransaction,
 ) int {
-	account, err := app.accounts.SelectByBankAccountId(tx.AccountId)
+	account, err := app.accounts.SelectByBankAccountId(ctx, tx.AccountId)
 	if err != nil {
 		panic(err)
 	}
@@ -263,27 +278,36 @@ func (app *application) loadNonCreditCardPaymentBankTransaction(
 		log.Fatal("debit and credit cannot both be empty")
 	}
 
-	numInserted, err := app.insertJournalEntry(jEntry)
+	numInserted, err := app.insertJournalEntry(ctx, jEntry)
 	if err != nil {
 		panic(err)
 	}
 	return numInserted
 }
 
-func (app *application) insertJournalEntry(jEntry JournalEntry) (int, error) {
-	jEntryId, err := app.jEntries.Insert(jEntry.Date, jEntry.Description)
+func (app *application) insertJournalEntry(
+	ctx context.Context,
+	jEntry JournalEntry,
+) (int, error) {
+	jEntryId, err := app.jEntries.Insert(
+		ctx,
+		jEntry.Date, jEntry.Description)
 	if err != nil {
 		return 0, err
 	}
 
-	_, err = app.jAcctEntries.Insert(jEntryId, "Debit", nil,
+	_, err = app.jAcctEntries.Insert(
+		ctx,
+		jEntryId, "Debit", nil,
 		jEntry.Debit.AccountType, jEntry.Debit.AccountName, jEntry.Debit.Amount,
 		jEntry.Debit.BankTransactionId)
 	if err != nil {
 		return 0, err
 	}
 
-	_, err = app.jAcctEntries.Insert(jEntryId, "Credit", nil,
+	_, err = app.jAcctEntries.Insert(
+		ctx,
+		jEntryId, "Credit", nil,
 		jEntry.Credit.AccountType, jEntry.Credit.AccountName, jEntry.Credit.Amount,
 		jEntry.Credit.BankTransactionId)
 	if err != nil {
@@ -320,13 +344,24 @@ func filterAlreadyImportedBankTransactions(
 	return filtered
 }
 
-func openDB(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", dsn)
+func openDB(dsn string) (*pgxpool.Pool, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Optional: Configure pool settings (e.g., max connections, lifetime)
+	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Unable to parse database config: %v", err)
 	}
-	if err = db.Ping(); err != nil {
-		return nil, err
+	config.MaxConns = 10
+	config.MaxConnLifetime = 30 * time.Minute
+	config.MinConns = 2
+
+	// Establish the connection pool
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to connect to database: %v", err)
 	}
-	return db, nil
+
+	return pool, nil
 }

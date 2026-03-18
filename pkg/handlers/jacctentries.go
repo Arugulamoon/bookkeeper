@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -14,7 +13,8 @@ import (
 )
 
 type JournalAccountEntryHandler struct {
-	DB *sql.DB
+	BookAccounts              *postgres.AccountModel
+	BookJournalAccountEntries *postgres.JournalAccountEntryModel
 }
 
 type EditJournalAccountEntryFormData struct {
@@ -29,8 +29,9 @@ func (h *JournalAccountEntryHandler) EditForm() echo.HandlerFunc {
 			return c.String(http.StatusBadRequest, "bad request")
 		}
 
-		jAcctEntryModel := &postgres.JournalAccountEntryModel{DB: h.DB}
-		entry, err := jAcctEntryModel.Select(data.Id)
+		entry, err := h.BookJournalAccountEntries.Select(
+			c.Request().Context(),
+			data.Id)
 		if err != nil {
 			if errors.Is(err, models.ErrNoRecord) {
 				return c.String(http.StatusNotFound, "not found")
@@ -40,8 +41,7 @@ func (h *JournalAccountEntryHandler) EditForm() echo.HandlerFunc {
 			}
 		}
 
-		accountModel := &postgres.AccountModel{DB: h.DB}
-		accts, err := accountModel.SelectAll()
+		accts, err := h.BookAccounts.SelectAll(c.Request().Context())
 		if err != nil {
 			return c.String(http.StatusInternalServerError,
 				"internal server error")
@@ -73,8 +73,9 @@ func (h *JournalAccountEntryHandler) Edit() echo.HandlerFunc {
 		acctType := acctParts[0]
 		acctName := acctParts[1]
 
-		jAcctEntryModel := &postgres.JournalAccountEntryModel{DB: h.DB}
-		_, err := jAcctEntryModel.UpdateAccount(data.Id, acctType, acctName)
+		_, err := h.BookJournalAccountEntries.UpdateAccount(
+			c.Request().Context(),
+			data.Id, acctType, acctName)
 		if err != nil {
 			return c.String(http.StatusInternalServerError,
 				"internal server error")
@@ -96,8 +97,9 @@ func (h *JournalAccountEntryHandler) SplitForm() echo.HandlerFunc {
 			return c.String(http.StatusBadRequest, "bad request")
 		}
 
-		jAcctEntryModel := &postgres.JournalAccountEntryModel{DB: h.DB}
-		entry, err := jAcctEntryModel.Select(data.Id)
+		entry, err := h.BookJournalAccountEntries.Select(
+			c.Request().Context(),
+			data.Id)
 		if err != nil {
 			if errors.Is(err, models.ErrNoRecord) {
 				return c.String(http.StatusNotFound, "not found")
@@ -107,8 +109,7 @@ func (h *JournalAccountEntryHandler) SplitForm() echo.HandlerFunc {
 			}
 		}
 
-		accountModel := &postgres.AccountModel{DB: h.DB}
-		accts, err := accountModel.SelectAll()
+		accts, err := h.BookAccounts.SelectAll(c.Request().Context())
 		if err != nil {
 			return c.String(http.StatusInternalServerError,
 				"internal server error")
@@ -138,9 +139,9 @@ func (h *JournalAccountEntryHandler) Split() echo.HandlerFunc {
 			return c.String(http.StatusBadRequest, "bad request")
 		}
 
-		jAcctEntryModel := &postgres.JournalAccountEntryModel{DB: h.DB}
-
-		entry, err := jAcctEntryModel.Select(data.Id)
+		entry, err := h.BookJournalAccountEntries.Select(
+			c.Request().Context(),
+			data.Id)
 		if err != nil {
 			if errors.Is(err, models.ErrNoRecord) {
 				return c.String(http.StatusNotFound, "not found")
@@ -160,13 +161,16 @@ func (h *JournalAccountEntryHandler) Split() echo.HandlerFunc {
 		acct2AcctType := acctParts[0]
 		acct2Name := acctParts[1]
 
-		_, err = jAcctEntryModel.UpdateAmount(data.Id, data.Amount1)
+		_, err = h.BookJournalAccountEntries.UpdateAmount(
+			c.Request().Context(),
+			data.Id, data.Amount1)
 		if err != nil {
 			return c.String(http.StatusInternalServerError,
 				"internal server error")
 		}
 
-		_, err = jAcctEntryModel.Insert(
+		_, err = h.BookJournalAccountEntries.Insert(
+			c.Request().Context(),
 			entry.JournalEntryId,
 			entry.BalanceType,
 			entry.AssignerId,

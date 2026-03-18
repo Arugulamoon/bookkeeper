@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"net/http"
 
 	"github.com/labstack/echo/v5"
@@ -11,7 +10,7 @@ import (
 )
 
 type SportsRegistrationHandler struct {
-	DB *sql.DB
+	SportsRegistrations *postgres.SportsRegistrationsModel
 }
 
 type ListData struct {
@@ -25,16 +24,16 @@ func (h *SportsRegistrationHandler) ListRegistrations() echo.HandlerFunc {
 			return c.String(http.StatusBadRequest, "bad request")
 		}
 
-		sportsRegModel := &postgres.SportsRegistrationsModel{DB: h.DB}
 		var regs []*models.SportsRegistration
 		var err error
 		switch data.Type {
 		case "currentAndUpcoming":
-			regs, err = sportsRegModel.SelectAllCurrentAndUpcoming()
+			regs, err = h.SportsRegistrations.SelectAllCurrentAndUpcoming(
+				c.Request().Context())
 		case "past":
-			regs, err = sportsRegModel.SelectAllPast()
+			regs, err = h.SportsRegistrations.SelectAllPast(c.Request().Context())
 		default:
-			regs, err = sportsRegModel.SelectAll()
+			regs, err = h.SportsRegistrations.SelectAll(c.Request().Context())
 		}
 		if err != nil {
 			return err

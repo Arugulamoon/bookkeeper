@@ -1,16 +1,18 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Arugulamoon/bookkeeper/pkg/config"
+	"github.com/Arugulamoon/bookkeeper/pkg/models/postgres"
 	"github.com/Arugulamoon/bookkeeper/pkg/web"
 )
 
@@ -49,6 +51,13 @@ func main() {
 
 		DB: db,
 
+		BookAccounts:              &postgres.AccountModel{DB: db},
+		BookAssigners:             &postgres.AssignerModel{DB: db},
+		BookJournalAccountEntries: &postgres.JournalAccountEntryModel{DB: db},
+
+		SportsRegistrations: &postgres.SportsRegistrationsModel{DB: db},
+		SportsMemberships:   &postgres.SportsMembershipModel{DB: db},
+
 		Templates: templates,
 	}
 
@@ -63,13 +72,24 @@ func main() {
 	errorLog.Fatal(err)
 }
 
-func openDB(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", dsn)
+func openDB(dsn string) (*pgxpool.Pool, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Optional: Configure pool settings (e.g., max connections, lifetime)
+	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Unable to parse database config: %v", err)
 	}
-	if err = db.Ping(); err != nil {
-		return nil, err
+	config.MaxConns = 10
+	config.MaxConnLifetime = 30 * time.Minute
+	config.MinConns = 2
+
+	// Establish the connection pool
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to connect to database: %v", err)
 	}
-	return db, nil
+
+	return pool, nil
 }

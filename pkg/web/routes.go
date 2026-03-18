@@ -7,6 +7,7 @@ import (
 	"github.com/labstack/echo/v5/middleware"
 
 	"github.com/Arugulamoon/bookkeeper/pkg/handlers"
+	"github.com/Arugulamoon/bookkeeper/pkg/sports"
 )
 
 func (app *Application) Routes() http.Handler {
@@ -23,38 +24,61 @@ func (app *Application) Routes() http.Handler {
 	e.Use(middleware.Secure())
 
 	// Routes
-	annualReportHandler := &handlers.AnnualReportHandler{DB: app.DB}
+	annualReportHandler := &handlers.AnnualReportHandler{
+		BookAccounts:              app.BookAccounts,
+		BookJournalAccountEntries: app.BookJournalAccountEntries,
+	}
 	e.GET("/", annualReportHandler.Show())
 
 	e.GET("/annualreport", annualReportHandler.Show())
 
-	jAcctHandler := &handlers.JournalAccountHandler{DB: app.DB}
+	jAcctHandler := &handlers.JournalAccountHandler{
+		BookAccounts:              app.BookAccounts,
+		BookJournalAccountEntries: app.BookJournalAccountEntries,
+	}
 	e.GET("/journal/account/:acctType/:acctName", jAcctHandler.Show())
 
-	jAcctEntryHandler := &handlers.JournalAccountEntryHandler{DB: app.DB}
+	jAcctEntryHandler := &handlers.JournalAccountEntryHandler{
+		BookAccounts:              app.BookAccounts,
+		BookJournalAccountEntries: app.BookJournalAccountEntries,
+	}
 	e.GET("/journal/account/entries/:id/edit", jAcctEntryHandler.EditForm())
 	e.POST("/journal/account/entries/:id/edit", jAcctEntryHandler.Edit())
 	e.GET("/journal/account/entries/:id/split", jAcctEntryHandler.SplitForm())
 	e.POST("/journal/account/entries/:id/split", jAcctEntryHandler.Split())
 
-	assignerHandler := &handlers.AssignerHandler{DB: app.DB}
+	assignerHandler := &handlers.AssignerHandler{
+		BookAccounts:              app.BookAccounts,
+		BookAssigners:             app.BookAssigners,
+		BookJournalAccountEntries: app.BookJournalAccountEntries,
+	}
 	e.GET("/assigners", assignerHandler.List())
 	e.GET("/assigner/create", assignerHandler.CreateForm())
 	e.POST("/assigner/create", assignerHandler.Create())
 	e.GET("/assigner/:id", assignerHandler.Show())
 
-	accountHandler := &handlers.AccountHandler{DB: app.DB}
+	accountHandler := &handlers.AccountHandler{
+		BookAccounts:              app.BookAccounts,
+		BookJournalAccountEntries: app.BookJournalAccountEntries,
+	}
 	e.GET("/accounts", accountHandler.List())
 	e.GET("/account/create", accountHandler.CreateForm())
 	e.POST("/account/create", accountHandler.Create())
 	e.GET("/account/:acctType/:acctName", accountHandler.Show())
 
-	sportsRegHandler := &handlers.SportsRegistrationHandler{DB: app.DB}
+	sportsRegHandler := &handlers.SportsRegistrationHandler{
+		SportsRegistrations: app.SportsRegistrations,
+	}
 	e.GET("/sports/registrations", sportsRegHandler.ListRegistrations())
 
-	sportsMembershipHandler := &handlers.SportsMembershipHandler{DB: app.DB}
+	sportsMembershipHandler := &handlers.SportsMembershipHandler{
+		SportsMemberships: app.SportsMemberships,
+	}
 	e.GET("/sports/memberships", sportsMembershipHandler.List())
 	e.GET("/sports/memberships/:id", sportsMembershipHandler.Show())
+
+	sports2RegistrationsHandler := &sports.RegistrationsHandler{DB: app.DB}
+	e.GET("/sports2/registrations", sports2RegistrationsHandler.ListRegistrations())
 
 	return e
 }

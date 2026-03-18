@@ -1,16 +1,23 @@
 package postgres
 
-import "database/sql"
+import (
+	"context"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
 
 type BankModel struct {
-	DB *sql.DB
+	DB *pgxpool.Pool
 }
 
-func (m *BankModel) Insert(id, name string) error {
+func (m *BankModel) Insert(
+	ctx context.Context,
+	id, name string,
+) error {
 	stmt := `
 		INSERT INTO bank.banks (id, name)
 		VALUES ($1, $2);`
-	_, err := m.DB.Exec(stmt, id, name)
+	_, err := m.DB.Exec(ctx, stmt, id, name)
 	if err != nil {
 		return err
 	}

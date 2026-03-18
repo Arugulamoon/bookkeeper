@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"net/http"
 	"time"
 
@@ -12,7 +11,8 @@ import (
 )
 
 type AnnualReportHandler struct {
-	DB *sql.DB
+	BookAccounts              *postgres.AccountModel
+	BookJournalAccountEntries *postgres.JournalAccountEntryModel
 }
 
 type ShowAnnualReportData struct {
@@ -33,8 +33,7 @@ func (h *AnnualReportHandler) Show() echo.HandlerFunc {
 			year = time.Now().Year()
 		}
 
-		accountModel := &postgres.AccountModel{DB: h.DB}
-		accts, err := accountModel.SelectAll()
+		accts, err := h.BookAccounts.SelectAll(c.Request().Context())
 		if err != nil {
 			c.Logger().Error(err.Error())
 			return c.String(http.StatusInternalServerError,
@@ -66,8 +65,8 @@ func (h *AnnualReportHandler) Show() echo.HandlerFunc {
 			},
 		}
 		for _, acct := range accts {
-			jAcctEntryModel := &postgres.JournalAccountEntryModel{DB: h.DB}
-			entries, err := jAcctEntryModel.SelectAllByAccountForYear(
+			entries, err := h.BookJournalAccountEntries.SelectAllByAccountForYear(
+				c.Request().Context(),
 				acct.AccountType, acct.Name, year)
 			if err != nil {
 				c.Logger().Error(err.Error())
